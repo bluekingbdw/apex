@@ -1,25 +1,145 @@
 # Apex 个人战绩采集器
 
-定时抓取自己的 Apex 战绩并本地存档。**默认模式不需要任何 API Key，开箱即用。**
+**v1.0** ｜ 第一阶段完成
 
-跑一次，你会得到三样东西：
+个人 Apex 战绩的本地查看器。**数据全部来自 tracker.gg，无需任何 API Key。**
 
-1. 终端摘要（段位 / RP / 生涯数据 + 与上次对比）
-2. **`Apex 战绩.md`** —— Obsidian 笔记，含趋势图和排行榜，每次自动更新
-3. **`apex-report.html`** —— 自包含图表报告，双击就能看
+## 功能一览（v1.0）
 
-两个数据源：
+| 区块 | 内容 |
+|---|---|
+| **Current Rating** | 段位徽章、RP、Top 百分位、排名，**本赛季峰值 / 历史峰值 RP** |
+| **Account** | 等级 / 转生 / 传奇数 / 追踪器 |
+| **最近表现** | RP 走势图（手写 SVG），**按赛季分段**，赛季选择器（默认最新赛季） |
+| **常用传奇** | 按出场数统计的传奇使用排行（独立页签） |
+| **对局记录** | 会话列表，**相对时间 + 绝对日期**、排位/匹配、**按赛季分组与筛选** |
+| **数据对比** | 与 tracker.gg 的采集指引 + 一致性校验（独立页签） |
 
-| provider | 需要 Key | 说明 |
+**界面特性**：战术 HUD 视觉风格、桌面版优先布局、零外部依赖（字体/SVG/图表全部自绘）。
+
+## 0. 快速开始
+
+```bash
+node server.mjs          # 起本地网页
+# 打开 http://127.0.0.1:8787
+```
+
+第一次打开会提示「还没有 tracker.gg 数据」。到「**数据对比**」页签按三步做一次采集
+（详情见第 2 节），之后每次查询都是**瞬时**的 —— 因为数据已在本地。
+
+## 1. 数据从哪来
+
+全部来自 **tracker.gg**（`apex.tracker.gg`），通过**浏览器采集**获得：
+
+| 数据 | 来源字段 | 说明 |
 |---|---|---|
-| `als`（默认） | ❌ 不需要 | 读 Apex Legends Status 的公开档案页，立刻可用 |
-| `trn` | ✅ `TRN_API_KEY` | Tracker Network 官方开发者 API，有对局历史 |
+| 等级 / RP / 段位 / 峰值 | `standardProfiles[0].segments[0]` | 含本赛季与历史峰值 RP |
+| 26 个传奇的击杀 / 伤害 / 胜场 | `standardProfiles[0].segments[1..26]` | 每个传奇一个分段 |
+| 对局记录 | `standardSessions[0].items` | **会话级聚合**（见下方说明）|
 
-每次运行最多 2 个请求，每小时 2 次远低于任何限流阈值。
+> **为什么必须用浏览器采集**：tracker.gg 全站由 Cloudflare 防护，
+> 服务端请求（含完整浏览器指纹头）一律返回 **403** 挑战页，只有过了 JS 挑战的真实浏览器能拿到数据。
+> 采集脚本已内置，一键复制，一次请求（站点限额 20 次/分钟）。
+
+> ⚠️ **对局是「会话级聚合」，不是逐场**：每个「会话」是一次连续游戏的合计
+> （所以单会话可能显示 254 杀），**没有地图与逐场时长**。
+> 界面已明确标注，避免误读。
+
+## 2. 采集步骤
+
+打开本站「**数据对比**」页签，那里有完整指引和**一键复制的脚本**。概要：
+
+1. 访问 `apex.tracker.gg/apex/profile/origin/<你的ID>/matches`
+2. 按 **F12** 打开控制台，粘贴脚本回车
+3. 回到本站刷新
+
+脚本会把页面里的 `__INITIAL_STATE__` 数据 POST 到本地 `POST /api/ingest/trn`，
+落盘到 `data/trn-sessions.json`。**一次请求，远低于站点 20 次/分钟的限额。**
+
+## 3. 排位 / 匹配 怎么区分
+
+Apex **只有排位赛才产生 RP**，所以：
+
+| 数据 | 判定 |
+|---|---|
+| tracker.gg 会话 | RP **有变动** → 排位；**变动为 0** → **未定** |
+
+> 为什么不用「匹配」这个词：净变化恰为 0 的**排位**也长这样，无法区分，
+> 所以标「未定」而不断言。行内有徽标，顶部可按 `全部 / 排位 / 匹配` 筛选。
+
+## 3.1 赛季分组与赛季时间
+
+对局记录**按赛季分组**，组头显示赛季名、开始日期、会话数、排位/未定分布与净 RP：
+
+```
+S30 · 诸神烙印 · 2026-08-05 起 · 14 个会话 · 排位 8 / 未定 6 · 净 RP +567
+08-10 12:32 → 09-12 04:15 · 第 1 段
+  … 14 行会话
+```
+
+顶部有**赛季筛选**（只列出真正有数据的赛季），**可与类型筛选叠加**
+（例如「S30 的排位局」）。
+
+> ⚠️ **赛季起止时间来自内置表**（`track.mjs` 的 `SEASONS`，1~30 季，
+> 来源维基百科中文版《Apex 英雄》赛季表）—— **tracker.gg 本身不提供赛季时间**，
+> 它的数据里只有 `currentSeason` 这个数字。赛季归属按会话时间戳推导，
+> 上下半段（split）按赛季中点划分。
+
+## 3.2 tracker.gg 独有：峰值 RP
+
+「Current Rating」卡会显示 **历史峰值 RP** 与**本赛季峰值**（如 `历史峰值 24,879 RP · 本赛季 12,464`）。
+这是 tracker.gg 提供、ALS 没有的数据。
+
+## 4. 环境变量
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `PORT` | `8787` | 端口 |
+| `HOST` | `127.0.0.1` | 监听地址，默认仅本机可访问 |
+| `APEX_TRACK_TIMEOUT_MS` | `60000` | 单次查询的硬超时，超时强杀子进程 |
+| `APEX_HTTP_TIMEOUT_MS` | `15000` | 单个上游 HTTP 请求的超时 |
+
+## 5. 命令行
+
+```bash
+node track.mjs --name bluekinger              # 默认就是 tracker.gg（读本地采集数据，不联网）
+node track.mjs --name bluekinger --json       # 输出 JSON
+node track.mjs --name bluekinger --provider als   # 可选：改用 ALS（免费但滞后）
+```
+
+| 参数 | 说明 |
+|---|---|
+| `--name` / `--uid` | 玩家名 / UID |
+| `--platform` | `PC` / `PS4` / `X1` |
+| `--provider` | `trn`（默认，tracker.gg）\| `als` \| `both` |
+| `--json` | 只输出一行 JSON（机器可读）|
+| `--no-save` | 不写任何文件 |
+| `--matches-source` | 对局来源：`trn`（默认）\| `als` \| `both` |
+
+接口：`POST /api/query`（查询）、`POST /api/collect`（采集存档）、
+`GET /api/history`（本地历史）、`POST /api/ingest/trn` + `GET /api/trn-sessions`（浏览器采集）、
+`GET /apex-report.html`（静态报告）。
 
 ---
 
-## 1. 跑一次
+## 附：ALS 数据源（可选，默认不使用）
+
+ALS（`apexlegendsstatus.com`）免费、无需 Key，**逐场明细更全**（含地图与时长），
+但**对局历史严重滞后**（实测最新只到 `07-18`，而 tracker.gg 有 `09-11`，相差约 55 天）。
+所以默认不用它；需要逐场明细时用 `--provider als`。
+
+| | tracker.gg（默认）| ALS（可选）|
+|---|---|---|
+| 聚合数据（等级/RP/段位/峰值） | ✅ 来自 profile | ✅ 官方接口、实时 |
+| 逐场明细（地图/时长/逐场 RP） | ❌ 只有会话聚合 | ✅ 有 |
+| 对局新鲜度 | ✅ 最新 | ❌ 滞后约 55 天 |
+| 需要 API Key | ❌ 不需要 | ❌ 不需要 |
+
+
+
+---
+
+## 1. 命令行跑一次
 
 ```bash
 cd ~/Desktop/apex
@@ -73,6 +193,15 @@ node track.mjs --uid 1010918821212
 
 > 只想安静采集、不要文件输出：加 `--no-note --no-report`。
 > 定时任务推荐：`--quiet --prune 90`（自动清理 90 天前的快照）。
+
+### 纯查询模式（不写任何文件）
+
+```bash
+node track.mjs --name bluekinger --json --no-save
+```
+
+- `--json` 输出一行 JSON（含全部战绩与每个传奇的分段数据），方便管道和程序调用
+- `--no-save` 跳过一切落盘：不建快照、不追加 `history.jsonl`、不生成笔记与报告
 
 ---
 
@@ -203,18 +332,77 @@ launchctl load ~/Library/LaunchAgents/com.local.apextracker.plist
 
 ---
 
-## 4. 切换到 Tracker.gg（可选）
+## 4. Tracker.gg 数据（**不需要 API Key**）
 
-1. https://tracker.gg/developers/apps → 登录 → **Create an app**
-2. 复制 App ID
-3. 运行：
+### 4.1 为什么不需要 Key
+
+tracker.gg 是 **Vue 服务端渲染**的，首屏数据以 `window.__INITIAL_STATE__` 的形式
+**直接嵌在 HTML 里**。证据：浏览器打开该页时控制台报
+`api.tracker.gg ... blocked by CORS policy` + `net::ERR_FAILED`
+（客户端 API 调用**全部失败**），但 Recent Matches 依然完整显示 —— 数据来自 HTML 本身。
+
+### 4.2 为什么必须在浏览器里采集
+
+tracker.gg 全站由 **Cloudflare 防护**。实测：
+
+| 请求方式 | 结果 |
+|---|---|
+| Node `fetch` 页面 HTML（含完整浏览器请求头） | **403**，返回 `Just a moment...` 挑战页 |
+| Node `fetch` `api.tracker.gg`（网站内部接口） | **403**，返回 `You've Been Blocked` |
+| 真实浏览器 | ✅ 正常（已通过 JS 挑战） |
+
+所以**服务端抓不到**，只有过了挑战的浏览器能拿数据。
+
+### 4.3 采集步骤（网页里一键复制脚本）
+
+打开本站的「**数据对比**」页签，那里有完整指引和可复制的脚本。概要：
+
+1. 新开标签页访问 `apex.tracker.gg/apex/profile/origin/<你的ID>/matches`
+2. 按 **F12** 打开控制台，粘贴脚本回车
+3. 回到本站刷新「数据对比」页签
+
+脚本把页面里已渲染的数据 POST 到 `POST /api/ingest/trn`，落盘到
+`data/trn-sessions.json`；`track.mjs --provider both` 会读取它。
+
+**限额**：站点 20 次/分钟，内置限速（默认 18 留余量，可用 `TRN_WEB_RPM` 调整），
+一次采集只发 1 个请求。
+
+### 4.4 命令行 / 两源混合
 
 ```bash
-export TRN_API_KEY="你的App ID"
-node track.mjs --provider trn --name bluekinger
+node track.mjs --provider both --name bluekinger   # ALS 聚合+逐场 + TRN 会话 + 交叉对比
 ```
 
-会额外抓取 `/sessions`（对局历史），存进 `data/snapshots/<ts>/trn.json`。
+**ALS 与 TRN 强项不同，所以「混合」而不是「替换」：**
+
+| | ALS | TRN |
+|---|---|---|
+| 聚合数据（等级/RP） | ✅ 官方接口、**实时** | ⚠️ 自己采集 |
+| 逐场明细（击杀/伤害/地图/时长/逐场 RP 变化） | ✅ 有 | ❌ 无 |
+| 对局新鲜度 | ❌ **滞后**（实测该玩家滞后约 55 天） | ✅ 新 |
+| 需要 Key | ❌ 不需要 | ❌ **也不需要**（抓网页） |
+
+> ⚠️ TRN 的 `/sessions` 只给**会话级聚合**（一次连续游戏的合计），不是逐场值 ——
+> 会话的 `stats` 与其中 match 的 `stats` 恒等，且 `duration` 恒为 `00:10:00`（不可信）。
+> 所以它适合「补最新对局」，不适合「取代 ALS」。
+
+TRN 数据源优先级：`官方 API`（配了 `TRN_API_KEY` 时）→ `网页直抓`（Cloudflare 放行时）
+→ `浏览器采集落盘`（默认可行）。
+
+### ⚠️ 速率限制：10 次/分钟
+
+tracker.gg 的 API **限制 10 次/分钟**，超了轻则返回 429，重则封 Key。
+
+- 本项目**默认不碰 tracker.gg**：`server.mjs` 不带 `--provider`，走的是
+  `als`（`apexlegendsstatus.com`）。只有显式 `--provider trn` + 配了 `TRN_API_KEY`
+  才会请求 `public-api.tracker.gg`。
+- `track.mjs` 内置**滑动窗口限流器**（`makeLimiter`），所有 TRN 请求都必须经过
+  `TRN_LIMITER`（上限设为 **8 次/分钟**，留安全余量）。
+  一次 `--provider trn` 运行只发 3 个请求（profile / segments / sessions），
+  连续反复运行也不会越过窗口上限。
+- **不要为了看数据去浏览器里刷 `apex.tracker.gg` 页面** —— 页面本身也会消耗额度，
+  而且它被 Cloudflare 防护，自动化访问没有意义。
+- 需要看对局数据请用本项目自己的 `--matches`（走 ALS，免费且无需 Key）。
 
 条款要点：免费、**仅限非商业**、一组织一 Key、滥用封号。
 Apex 专属说明：https://apex.tracker.gg/site-api

@@ -2,3 +2,6 @@ node_modules/
 .env
 .DS_Store
 .obsidian/plugins/
+
+# 抓取快照是可重新生成的存档（每次 CLI 运行都会新增一个目录），不入库
+data/snapshots/

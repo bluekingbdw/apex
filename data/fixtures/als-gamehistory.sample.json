@@ -1,0 +1,61 @@
+{
+  "_comment": "ALS gameHistory 响应的**结构忠实**样本（据 2026-09-14 实测的真实 HTML 摘要重建）。用于离线验证 parseGameHistory 的排位/匹配分类，不依赖网络。",
+  "_purpose": "验证 playlist 推导：有 RP → ranked；无 RP → pubs。同时断言「有RP」与「bold 含 BR」两个信号一致。",
+  "_observedRules": {
+    "排位场": "bold = [Legend, \"BR\"]，含 `1,234 RP`，含 ranks/xxx.png",
+    "匹配场": "bold = [Legend]（无 BR），**不含 RP**，无 ranks 图",
+    "Game mode 字段": "排位场为空；匹配场为 \"Battle Royale\" 或 \"Unknown\""
+  },
+  "split": "s29_s2",
+  "sessionWhen": "1 month 26 days ago",
+  "games": [
+    {
+      "legend": "Valkyrie",
+      "boldExtra": "BR",
+      "rp": "12,389",
+      "rpChange": "green:64",
+      "rank": "diamond4",
+      "lasted": "16m 9s",
+      "gameMode": null,
+      "map": "Storm Point",
+      "level": "1,110",
+      "expectPlaylist": "ranked"
+    },
+    {
+      "legend": "Wraith",
+      "boldExtra": null,
+      "rp": null,
+      "rpChange": null,
+      "rank": null,
+      "lasted": "12m 1s",
+      "gameMode": "Battle Royale",
+      "map": "Kings Canyon",
+      "level": "1,108",
+      "expectPlaylist": "pubs"
+    },
+    {
+      "legend": "Rampart",
+      "boldExtra": "BR",
+      "rp": "11,818",
+      "rpChange": "red:43",
+      "rank": "platinum1",
+      "lasted": "8m 4s",
+      "gameMode": null,
+      "map": "Edistrict",
+      "level": "1,109",
+      "expectPlaylist": "ranked"
+    },
+    {
+      "legend": "Alter",
+      "boldExtra": null,
+      "rp": null,
+      "rpChange": null,
+      "rank": null,
+      "lasted": "5m 24s",
+      "gameMode": "Unknown",
+      "map": "Edistrict",
+      "level": "1,108",
+      "expectPlaylist": "pubs"
+    }
+  ]
+}

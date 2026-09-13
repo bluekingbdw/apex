@@ -1,0 +1,130 @@
+{
+  "_comment": "TRN /sessions 接口的真实响应样本（结构取自 tracker.gg 页面内嵌数据，2026-09-14 提取）。仅保留前端/解析用得到的字段。用于在**没有 TRN_API_KEY** 的情况下验证 normalizeTrnSessions() 与对比分析逻辑。",
+  "_shape": {
+    "data.items[]": "一个「会话」（同一时段连打的若干局）",
+    "items[].metadata.startDate/endDate/duration/isActive": "{value, displayValue}",
+    "items[].matches[]": "该会话内的对局",
+    "items[].matches[].metadata.legend/character": "{value: 数字ID, displayValue: 英文名}",
+    "items[].matches[].stats": "level/kills/damage/rankScore/rankScoreChange/arenaRankScore/wins，每项 {value, displayValue}",
+    "⚠️": "会话级 stats 与 match 级 stats 恒等（实测 allSame=true），且量级明显不是单场 → 是**会话聚合**，不是逐场值"
+  },
+  "data": {
+    "items": [
+      {
+        "metadata": {
+          "startDate": { "value": "2026-09-11T20:15:02.617887Z", "displayValue": "2026-09-11T20:15:02.6178870Z" },
+          "endDate": { "value": "2026-09-11T20:25:02.617887Z", "displayValue": "2026-09-11T20:25:02.6178870Z" },
+          "duration": { "value": "00:10:00", "displayValue": "00:10:00" },
+          "isActive": { "value": false, "displayValue": "False" }
+        },
+        "matches": [
+          {
+            "id": "4a660b6d-de1f-40cb-8676-71645c2f497b",
+            "metadata": {
+              "result": { "value": "unknown", "displayValue": "Unknown" },
+              "endDate": { "value": "2026-09-11T20:25:02.617887Z" },
+              "character": { "value": 9, "displayValue": "Octane" },
+              "legend": { "value": 9, "displayValue": "Octane" },
+              "legendColor": { "value": "#80B662" }
+            },
+            "stats": {
+              "level": { "value": 1147, "displayValue": "1,147" },
+              "kills": { "value": 254, "displayValue": "254" },
+              "damage": { "value": 82760, "displayValue": "82,760" },
+              "rankScore": { "value": 12368, "displayValue": "12,368" },
+              "rankScoreChange": { "value": 0, "displayValue": "0" },
+              "arenaRankScore": { "value": 0, "displayValue": "0" },
+              "wins": { "value": 13, "displayValue": "13" }
+            }
+          }
+        ],
+        "stats": {
+          "kills": { "value": 254, "displayValue": "254" },
+          "damage": { "value": 82760, "displayValue": "82,760" },
+          "rankScore": { "value": 12368, "displayValue": "12,368" },
+          "rankScoreChange": { "value": 0, "displayValue": "0" },
+          "arenaRankScore": { "value": 0, "displayValue": "0" },
+          "wins": { "value": 13, "displayValue": "13" }
+        }
+      },
+      {
+        "metadata": {
+          "startDate": { "value": "2026-09-09T00:31:28.782754Z", "displayValue": "2026-09-09T00:31:28.7827540Z" },
+          "endDate": { "value": "2026-09-09T00:41:28.782754Z" },
+          "duration": { "value": "00:10:00", "displayValue": "00:10:00" },
+          "isActive": { "value": false, "displayValue": "False" }
+        },
+        "matches": [
+          {
+            "id": "971ce6c7-fa80-448f-8d47-0816ab21424b",
+            "metadata": {
+              "result": { "value": "unknown", "displayValue": "Unknown" },
+              "endDate": { "value": "2026-09-09T00:41:28.782754Z" },
+              "character": { "value": 24, "displayValue": "Ballistic" },
+              "legend": { "value": 24, "displayValue": "Ballistic" },
+              "legendColor": { "value": "#1B9ACC" }
+            },
+            "stats": {
+              "level": { "value": 1147, "displayValue": "1,147" },
+              "kills": { "value": 22, "displayValue": "22" },
+              "rankScore": { "value": 12368, "displayValue": "12,368" },
+              "rankScoreChange": { "value": 0, "displayValue": "0" },
+              "arenaRankScore": { "value": 0, "displayValue": "0" }
+            }
+          }
+        ],
+        "stats": {
+          "kills": { "value": 22, "displayValue": "22" },
+          "rankScore": { "value": 12368, "displayValue": "12,368" },
+          "rankScoreChange": { "value": 0, "displayValue": "0" },
+          "arenaRankScore": { "value": 0, "displayValue": "0" }
+        }
+      },
+      {
+        "metadata": {
+          "startDate": { "value": "2026-09-08T18:25:57.022033Z", "displayValue": "2026-09-08T18:25:57.0220330Z" },
+          "endDate": { "value": "2026-09-08T18:35:57.022033Z" },
+          "duration": { "value": "00:10:00", "displayValue": "00:10:00" },
+          "isActive": { "value": false, "displayValue": "False" }
+        },
+        "matches": [
+          {
+            "id": "242d9597-7c8b-4037-b949-6a751b67f33b",
+            "metadata": {
+              "result": { "value": "unknown", "displayValue": "Unknown" },
+              "endDate": { "value": "2026-09-08T18:35:57.022033Z" },
+              "character": { "value": 17, "displayValue": "Valkyrie" },
+              "legend": { "value": 17, "displayValue": "Valkyrie" },
+              "legendColor": { "value": "#8260A8" }
+            },
+            "stats": {
+              "level": { "value": 1147, "displayValue": "1,147" },
+              "kills": { "value": 1, "displayValue": "1" },
+              "damage": { "value": 368, "displayValue": "368" },
+              "rankScore": { "value": 12368, "displayValue": "12,368" },
+              "rankScoreChange": { "value": 0, "displayValue": "0" },
+              "arenaRankScore": { "value": 0, "displayValue": "0" }
+            }
+          }
+        ],
+        "stats": {
+          "kills": { "value": 1, "displayValue": "1" },
+          "damage": { "value": 368, "displayValue": "368" },
+          "rankScore": { "value": 12368, "displayValue": "12,368" },
+          "rankScoreChange": { "value": 0, "displayValue": "0" },
+          "arenaRankScore": { "value": 0, "displayValue": "0" }
+        }
+      }
+    ]
+  },
+  "_observedFacts": {
+    "sessionCountTotal": 87,
+    "allSessionsHave1Match": true,
+    "sessionStatsEqualsMatchStats": true,
+    "durationAlwaysDefault": "00:10:00",
+    "newestSessionStart": "2026-09-11T20:15:02.617887Z",
+    "rpAtNewestSession": 12368,
+    "level": 1147,
+    "note": "duration 恒为 00:10:00 → 该字段不可信，不要用来算时长"
+  }
+}

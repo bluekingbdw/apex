@@ -1,0 +1,2556 @@
+<!DOCTYPE html>
+<!-- 桌面版优先：`desk` 类是总开关。带上它时，页面始终按桌面版排版，
+     不会因为窗口/容器变窄而切成单栏移动版 —— 窄容器改为横向滚动。
+     想恢复响应式：把下面这行的 class="desk" 删掉即可。 -->
+<html lang="zh-CN" class="desk">
+<head>
+<meta charset="utf-8">
+<!-- 固定布局宽度：手机等真窄设备也按桌面版缩放着显示，而不是切成单栏 -->
+<meta name="viewport" content="width=1280">
+<title>Apex 战绩查询</title>
+<style>
+  /* ══════════════════════════════════════════════════════════════
+     视觉方向｜战术 HUD（军工数据台）
+     ──────────────────────────────────────────────────────────────
+     · 底色近黑，带一点冷灰。面板不是纯色块 —— 叠了细网格、扫描线、
+       噪声颗粒，让它像一块通电的设备外壳，而不是一张卡片。
+     · 三个功能色，各有明确职责，不做均匀铺色：
+         琥珀 #ff9f28 = 主强调（段位 / RP / 模块标记）
+         钢青 #5ed0d8 = 正向（涨分）
+         余烬 #ff5a37 = 负向（掉分 / 错误）
+     · 字体零外部依赖：正文走系统 UI 栈，**所有数字走等宽栈**。
+       数据读数用等宽字体是整套设计最关键的个性来源，
+       配合字距 / 字重 / 全大写 / 尺寸落差，不靠特殊字体也能立住。
+     · 形状语言：面板直角 + 角标；小构件（头像 / 徽标 / 按钮）用 clip-path 切角。
+     ══════════════════════════════════════════════════════════════ */
+  :root{
+    color-scheme:dark;
+
+    /* 表面：从底盘到浮层 */
+    --void:#06070a;
+    --deck:#0b0d10;
+    --plate:#121517;
+    --plate-2:#181c1f;
+    --plate-3:#1f2428;
+
+    /* 分隔线：极细，靠层次而非粗边框撑结构 */
+    --hair:rgba(255,255,255,.065);
+    --hair-2:rgba(255,255,255,.13);
+
+    /* 文字：暖白而非纯白，长时间看不刺眼 */
+    --ink:#eae8e3;
+    --ink-2:#a4abb3;
+    --ink-3:#6b737c;
+
+    --amber:#ff9f28;
+    --amber-2:#ffc46e;
+    --amber-08:rgba(255,159,40,.08);
+    --amber-16:rgba(255,159,40,.16);
+    --amber-32:rgba(255,159,40,.32);
+
+    --steel:#5ed0d8;
+    --steel-32:rgba(94,208,216,.32);
+    --ember:#ff5a37;
+    --ember-32:rgba(255,90,55,.32);
+
+    /* 系统字体栈：零外部依赖 */
+    --font-ui:"Helvetica Neue",Helvetica,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --font-data:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+
+    /* 旧变量名别名：万一有遗漏引用不至于变成无效值 */
+    --bg:var(--deck); --panel:var(--plate); --panel-2:var(--plate-2);
+    --line:var(--hair); --line-2:var(--hair-2);
+    --text:var(--ink); --muted:var(--ink-2); --dim:var(--ink-3);
+    --gold:var(--amber); --accent:var(--amber); --ok:var(--steel); --err:var(--ember);
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;min-height:100vh;background:var(--deck);color:var(--ink);
+    font:15px/1.55 var(--font-ui);
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  /* 底层纹理：细网格（顶部最亮，往下渐隐）+ 扫描线 + 噪声颗粒。
+     全部用 CSS 渐变与内联 SVG，不引任何外部资源 */
+  body::before{
+    content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:
+      linear-gradient(rgba(255,255,255,.024) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.024) 1px,transparent 1px);
+    background-size:46px 46px;
+    -webkit-mask-image:radial-gradient(125% 95% at 50% -5%,#000 15%,transparent 76%);
+    mask-image:radial-gradient(125% 95% at 50% -5%,#000 15%,transparent 76%);
+  }
+  body::after{
+    content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.55;
+    background-image:
+      repeating-linear-gradient(180deg,rgba(0,0,0,.42) 0 1px,transparent 1px 3px),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.16'/%3E%3C/svg%3E");
+  }
+  .wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:0 20px 80px}
+  /* 桌面版优先：内容区不小于桌面宽度。
+     容器更窄时不缩排、不降级，而是让外层横向滚动（避免卡片被压扁到不可读）。
+     注意这里给 body 设的是 visible 而不是 auto —— 设 auto 会让 body 变成滚动容器
+     （另一轴会被计算成 auto），进而让 window.scrollTo / scrollIntoView 失效。 */
+  html.desk .wrap{min-width:1080px}
+  html.desk body{overflow-x:visible}
+
+  /* ══════ Hero：干员档案头 ══════ */
+  .hero{
+    position:relative;margin:0 -20px;padding:0 20px;overflow:hidden;
+    background:linear-gradient(180deg,#161a1e 0%,#0d1013 78%);
+    border-bottom:1px solid var(--hair-2);
+  }
+  .hero-lay{position:absolute;inset:0;pointer-events:none}
+  /* 网格：比页面底纹更细更亮，只铺上半部 */
+  .hero-lay-grid{
+    background-image:
+      linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+    background-size:23px 23px;
+    -webkit-mask-image:linear-gradient(180deg,#000,transparent 82%);
+    mask-image:linear-gradient(180deg,#000,transparent 82%);
+  }
+  /* 琥珀主光偏左上，像指示灯打在面板上 */
+  .hero-lay-glow{
+    background:
+      radial-gradient(680px 260px at 8% -10%,rgba(255,159,40,.16),transparent 68%),
+      radial-gradient(520px 220px at 82% -20%,rgba(94,208,216,.09),transparent 70%);
+  }
+  /* 扫描带：一道很淡的亮带缓慢扫过，给静态页面一点“设备在跑”的感觉 */
+  .hero-lay-scan{
+    top:-40%;height:40%;
+    background:linear-gradient(180deg,transparent,rgba(255,255,255,.05) 50%,transparent);
+    animation:sweep 7.5s cubic-bezier(.4,0,.6,1) infinite;
+  }
+  @keyframes sweep{0%{top:-40%}60%,100%{top:118%}}
+
+  .hero-inner{
+    position:relative;z-index:1;display:flex;align-items:center;gap:16px;
+    flex-wrap:wrap;padding:30px 0 22px;
+  }
+  /* 头像：首字母打底，传奇立绘叠在上层 —— 未加载或加载失败都不会留空白
+     注意：不能用 opacity 隐藏底图，也不给大图加 decoding=async（见仓库记忆） */
+  .avatar-wrap{
+    position:relative;width:66px;height:66px;flex:none;overflow:hidden;
+    background:#0c0f11;border:1px solid var(--hair-2);
+    clip-path:polygon(15px 0,100% 0,100% calc(100% - 15px),calc(100% - 15px) 100%,0 100%,0 15px);
+  }
+  .avatar-wrap .avatar-fallback{
+    width:100%;height:100%;display:grid;place-items:center;font-size:25px;
+    background:linear-gradient(140deg,#2a2f34,#12161a);color:var(--amber);
+  }
+  .avatar-wrap .av{
+    position:absolute;inset:0;width:100%;height:100%;z-index:1;
+    object-fit:cover;object-position:50% 12%;
+  }
+  .who{min-width:0}
+  .eyebrow{
+    display:flex;align-items:center;gap:7px;
+    font:600 10px/1 var(--font-data);letter-spacing:.22em;text-transform:uppercase;color:var(--amber);
+  }
+  .eyebrow::before{content:'';width:11px;height:2px;background:var(--amber)}
+  .who h1{
+    margin:9px 0 0;font-size:clamp(25px,4.4vw,36px);font-weight:800;
+    letter-spacing:-.035em;line-height:1;
+  }
+  .chips{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+  /* 徽标：等宽小字 + 切角，像贴纸标签 */
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;
+    font:600 10px/1 var(--font-data);letter-spacing:.1em;text-transform:uppercase;
+    padding:5px 8px;color:var(--ink-2);background:var(--plate-2);border:1px solid var(--hair-2);
+    clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
+  }
+  .chip.live{color:var(--steel);border-color:var(--steel-32);background:rgba(94,208,216,.07)}
+  .chip.live::before{
+    content:'';width:5px;height:5px;flex:none;border-radius:50%;background:var(--steel);
+    animation:pulse 2.4s ease-out infinite;
+  }
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(94,208,216,.55)}
+    70%,100%{box-shadow:0 0 0 7px rgba(94,208,216,0)}
+  }
+  .chip.gold,.chip.amber{color:var(--amber);border-color:var(--amber-32);background:var(--amber-08)}
+
+  /* 右侧读数框：LINK STATUS + 状态灯 */
+  .hero .spacer{flex:1}
+  .readout{display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-left:auto}
+  .readout-k{font:600 9.5px/1 var(--font-data);letter-spacing:.22em;color:var(--ink-3)}
+  #status{
+    display:inline-flex;align-items:center;gap:8px;white-space:nowrap;
+    font:600 10.5px/1 var(--font-data);letter-spacing:.1em;text-transform:uppercase;
+    padding:8px 12px;color:var(--ink-2);background:var(--plate-2);border:1px solid var(--hair-2);
+    clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
+  }
+  #status::before{content:'';width:6px;height:6px;flex:none;border-radius:50%;background:var(--ink-3)}
+  #status.ok{color:var(--steel);border-color:var(--steel-32);background:rgba(94,208,216,.07)}
+  #status.ok::before{background:var(--steel)}
+  #status.err{color:var(--ember);border-color:var(--ember-32);background:rgba(255,90,55,.08)}
+  #status.err::before{background:var(--ember)}
+
+  /* 以下窄屏规则仅在「响应式」模式下生效。
+     桌面版优先时（html 带 desk 类）全部跳过，保证不会退化成单栏移动版 */
+  @media(max-width:600px){
+    html:not(.desk) .hero-inner{padding:24px 0 18px;gap:14px}
+    html:not(.desk) .readout{flex-direction:row;align-items:center;gap:10px;margin-left:0;width:100%}
+  }
+
+  /* 底部危险条纹：呼应设备上的警示带。
+     高度太小（≤3px）时 135° 斜纹会退化成虚线，所以抬高到 4px 并用 45° +
+     深色间隔，才看得出“警示带”而不是“虚线” */
+  .tape{
+    position:relative;z-index:1;height:4px;opacity:.42;
+    background:repeating-linear-gradient(45deg,var(--amber) 0 6px,#0b0d10 6px 12px);
+  }
+
+  /* tabs：等宽小标签 + 琥珀下划线，激活条从左侧长出 */
+  .tabs{
+    position:relative;z-index:1;display:flex;gap:2px;
+    overflow-x:auto;scrollbar-width:none;border-top:1px solid var(--hair);
+    /* 右端渐隐：提示还能横向滚动（桌面无溢出时此处为空，不影响观感） */
+    -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 30px),transparent);
+    mask-image:linear-gradient(90deg,#000 calc(100% - 30px),transparent);
+  }
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{
+    appearance:none;background:none;border:0;cursor:pointer;position:relative;
+    font:600 12px/1 var(--font-ui);letter-spacing:.07em;color:var(--ink-3);
+    padding:14px 15px;transition:color .16s,background .16s;
+    /* 页签多了以后窄屏放不下：禁止压缩 + 禁止折行，让它横向滚动
+       （否则 flex 会把按钮压扁，「常用传奇」会竖排成四行） */
+    flex:none;white-space:nowrap;
+  }
+  .tabs button::after{
+    content:'';position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--amber);
+    transform:scaleX(0);transform-origin:left;
+    transition:transform .24s cubic-bezier(.2,.8,.2,1);
+  }
+  .tabs button:hover{color:var(--ink-2);background:rgba(255,255,255,.025)}
+  .tabs button.on{color:var(--ink)}
+  .tabs button.on::after{transform:scaleX(1)}
+
+  /* ══════ 搜索：控制台输入区 ══════ */
+  .search{margin:22px 0 20px}
+  .row{display:grid;grid-template-columns:1.25fr 1fr 96px auto;gap:10px;align-items:end}
+  .field{display:flex;flex-direction:column;gap:7px;min-width:0}
+  .field-k{
+    display:flex;align-items:center;gap:6px;
+    font:600 9.5px/1 var(--font-data);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);
+  }
+  .field-k::before{content:'';width:3px;height:9px;background:var(--amber);opacity:.75}
+  input,select{
+    width:100%;height:44px;padding:0 12px;border-radius:0;outline:none;
+    background:var(--plate-2);color:var(--ink);
+    font:500 14px/1 var(--font-data);letter-spacing:.02em;
+    border:1px solid var(--hair-2);
+    transition:border-color .16s,background .16s,box-shadow .16s;
+  }
+  input::placeholder{color:#575f68;font-family:var(--font-ui);letter-spacing:0}
+  input:focus,select:focus{
+    border-color:var(--amber);background:#1b1f23;
+    box-shadow:0 0 0 1px var(--amber-32),inset 0 0 24px -10px var(--amber-32);
+  }
+  select{appearance:none;cursor:pointer;padding-right:30px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4.5L6 8.5L10 4.5' stroke='%23ff9f28' stroke-width='1.8' fill='none' stroke-linecap='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 11px center}
+  button.go{
+    display:inline-flex;align-items:center;gap:9px;height:44px;padding:0 22px;
+    cursor:pointer;border:0;border-radius:0;white-space:nowrap;
+    font:700 13px/1 var(--font-ui);letter-spacing:.1em;color:#0b0d10;
+    background:linear-gradient(135deg,var(--amber-2),var(--amber));
+    clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px);
+    transition:filter .16s,transform .1s;
+  }
+  .go-glyph{width:0;height:0;flex:none;border-left:7px solid #0b0d10;
+    border-top:5px solid transparent;border-bottom:5px solid transparent}
+  button.go:hover{filter:brightness(1.12)}
+  button.go:active{transform:translateY(1px)}
+  button.go:disabled{opacity:.5;cursor:not-allowed;filter:grayscale(.55)}
+  @media(max-width:720px){
+    html:not(.desk) .row{grid-template-columns:1fr;gap:12px}
+    html:not(.desk) .row .field:nth-child(3){max-width:170px}
+    html:not(.desk) button.go{width:100%;justify-content:center}
+  }
+  .note{padding:18px 0;color:var(--ink-3);font-size:12.5px;line-height:1.7}
+  #hint{text-align:center;font-size:12px}
+  #hint b{color:var(--ink-2);font-weight:650}
+  .spin{display:inline-block;width:13px;height:13px;margin-right:9px;vertical-align:-2.5px;
+    border:2px solid var(--hair-2);border-top-color:var(--amber);border-radius:50%;
+    animation:rot .7s linear infinite}
+  @keyframes rot{to{transform:rotate(360deg)}}
+
+  /* ── 骨架屏 ── */
+  #skeleton{display:none}
+  #skeleton.on{display:block}
+  .sk{background:linear-gradient(90deg,#161a1e 25%,#222831 37%,#161a1e 63%);
+    background-size:400% 100%;animation:shimmer 1.5s ease infinite}
+  @keyframes shimmer{0%{background-position:100% 0}100%{background-position:0 0}}
+  .sk-cols{display:grid;grid-template-columns:296px 1fr;gap:14px}
+  @media(max-width:820px){html:not(.desk) .sk-cols{grid-template-columns:1fr}}
+  .sk-card{background:var(--plate);border:1px solid var(--hair);padding:19px 21px;margin-bottom:14px}
+  .sk-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:18px 22px}
+
+  /* ── 工具条（排序切换） ── */
+  .tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto}
+  .tbtn{
+    appearance:none;cursor:pointer;padding:6px 10px;background:transparent;
+    font:600 10px/1 var(--font-data);letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-3);border:1px solid var(--hair-2);
+    transition:color .16s,border-color .16s,background .16s;
+  }
+  .tbtn:hover{color:var(--ink-2);background:rgba(255,255,255,.03)}
+  .tbtn.on{color:var(--amber);border-color:var(--amber-32);background:var(--amber-08)}
+  .lg[hidden]{display:none}
+  pre.errbox{
+    margin:0 0 20px;padding:14px 16px;color:#ffb9a8;
+    background:linear-gradient(180deg,rgba(255,90,55,.09),rgba(255,90,55,.035));
+    border:1px solid var(--ember-32);border-left-width:3px;
+    font:500 12px/1.65 var(--font-data);white-space:pre-wrap;word-break:break-word;
+  }
+  #result{display:none}
+  #result.on{display:block}
+  /* 入场：一次编排好的错落上浮，比零散的微动效更有仪式感 */
+  #result.on .card{animation:rise .5s cubic-bezier(.2,.8,.2,1) backwards}
+  #result.on .card:nth-child(1){animation-delay:.03s}
+  #result.on .card:nth-child(2){animation-delay:.09s}
+  #result.on .card:nth-child(3){animation-delay:.15s}
+  #result.on .card:nth-child(4){animation-delay:.21s}
+  @keyframes rise{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+
+  /* ══════ 两栏 ══════ */
+  .cols{display:grid;grid-template-columns:296px 1fr;gap:14px;align-items:start}
+  @media(max-width:820px){html:not(.desk) .cols{grid-template-columns:1fr}}
+
+  /* ══════ 面板（模块） ══════
+     直角 + 左上 / 右下角标，是整套 HUD 的骨架。
+     角标用 ::before/::after 画，不需要额外标签 */
+  .card{
+    position:relative;background:linear-gradient(180deg,var(--plate-2),var(--plate));
+    border:1px solid var(--hair);padding:19px 21px 21px;margin-bottom:14px;
+  }
+  .card::before,.card::after{content:'';position:absolute;width:13px;height:13px;pointer-events:none}
+  .card::before{top:-1px;left:-1px;border-top:2px solid var(--amber-32);border-left:2px solid var(--amber-32)}
+  .card::after{bottom:-1px;right:-1px;border-bottom:2px solid var(--hair-2);border-right:2px solid var(--hair-2)}
+  .card:hover::before{border-color:var(--amber)}
+
+  /* 模块标题栏：标记 + 模块代码 + 标题 + 右侧说明，下方一条细线收起 */
+  .card>h2{
+    display:flex;align-items:center;gap:9px;margin:0 0 18px;padding-bottom:13px;
+    font-size:15px;font-weight:700;letter-spacing:-.01em;border-bottom:1px solid var(--hair);
+  }
+  .card>h2 .ico{
+    width:4px;height:15px;flex:none;background:var(--amber);
+    clip-path:polygon(0 0,100% 0,100% 72%,50% 100%,0 72%);
+  }
+  .card>h2 .code{
+    align-self:center;padding-right:9px;margin-right:1px;
+    font:600 9.5px/1 var(--font-data);letter-spacing:.2em;text-transform:uppercase;
+    color:var(--ink-3);border-right:1px solid var(--hair-2);
+  }
+  .card>h2 .sub{
+    margin-left:auto;font:500 10.5px/1 var(--font-data);letter-spacing:.06em;
+    text-transform:uppercase;color:var(--ink-3);
+  }
+  /* sub 已经吃掉了弹性空间，tools 紧跟其后，否则两个 auto 会把标题栏扯开 */
+  .card>h2 .sub+.tools,.card>h2 .sub~.tools{margin-left:12px}
+
+  /* 段位展示 */
+  .ranknow{display:flex;align-items:center;gap:15px}
+  .ranknow img{width:64px;height:64px;flex:none;object-fit:contain;
+    filter:drop-shadow(0 4px 12px rgba(0,0,0,.75))}
+  .ranknow .nm{font-size:19px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+  .ranknow .rp{margin-top:6px;font:700 30px/1 var(--font-data);letter-spacing:-.02em;
+    color:var(--amber);font-variant-numeric:tabular-nums}
+  .ranknow .rp sup{vertical-align:7px;margin-left:3px;
+    font:600 10px/1 var(--font-data);letter-spacing:.14em;color:var(--ink-3)}
+  .ranknow .pct{margin-top:8px;font:500 10.5px/1.5 var(--font-data);letter-spacing:.06em;color:var(--ink-3)}
+  /* 峰值 RP：比百分位稍强一点，因为这是 tracker.gg 独有的信息 */
+  .ranknow .pct.peak{margin-top:5px;color:var(--ink-2)}
+
+  /* 百分位仪表：底纹是刻度槽，填充是琥珀 */
+  .meter{position:relative;height:6px;margin-top:9px;
+    background:repeating-linear-gradient(90deg,var(--hair-2) 0 2px,transparent 2px 5px)}
+  .meter>i{position:relative;display:block;height:100%;
+    background:linear-gradient(90deg,var(--amber),var(--amber-2));
+    box-shadow:0 0 14px -2px var(--amber-32)}
+
+  /* ── 数据格：左侧刻度条 + 等宽大数值 + 百分位 ── */
+  .statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:20px 22px}
+  .stat{position:relative;padding-left:14px;min-width:0}
+  .stat::before{
+    content:'';position:absolute;left:0;top:3px;bottom:3px;width:3px;
+    background:linear-gradient(180deg,var(--amber),rgba(255,159,40,.06));
+  }
+  .stat::after{content:'';position:absolute;left:0;top:0;width:9px;height:1px;background:var(--amber)}
+  .stat .l{
+    display:block;font-size:11px;font-weight:600;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink-3);line-height:1.4;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .stat .v{
+    display:block;margin-top:6px;font:700 25px/1.15 var(--font-data);
+    letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--ink);
+  }
+  .stat .p{margin-top:4px;display:block;
+    font:500 10.5px/1.5 var(--font-data);letter-spacing:.04em;color:var(--ink-3);
+    font-variant-numeric:tabular-nums}
+  .stat.gold .v,.stat.amber .v{color:var(--amber)}
+  .stat.big .v{font-size:31px}
+
+  /* 大数值行（面板顶部） */
+  .statrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:20px 22px;
+    padding-bottom:20px;margin-bottom:19px;border-bottom:1px solid var(--hair)}
+
+  hr.sep{border:0;height:1px;margin:17px 0;
+    background:linear-gradient(90deg,var(--hair-2),var(--hair),transparent)}
+
+  /* ── 侧栏小条目 ── */
+  .mini{display:flex;align-items:center;gap:11px}
+  .mini img{width:38px;height:38px;flex:none;object-fit:contain}
+  .mini .k{font:600 9.5px/1 var(--font-data);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3)}
+  .mini .v{margin-top:7px;font-size:15px;font-weight:650;letter-spacing:-.01em}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:17px 14px}
+  .two .k{margin-bottom:7px;font:600 9.5px/1 var(--font-data);letter-spacing:.16em;
+    text-transform:uppercase;color:var(--ink-3)}
+  .two .v{font:700 15.5px/1.25 var(--font-data);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+
+  /* ══════ Legend 卡片 ══════ */
+  .legends{display:grid;grid-template-columns:repeat(auto-fill,minmax(292px,1fr));gap:12px}
+  .lg{
+    position:relative;background:var(--plate);border:1px solid var(--hair);padding:15px 16px;
+    transition:border-color .16s,background .16s,transform .16s;
+  }
+  .lg:hover{border-color:var(--hair-2);background:var(--plate-2);transform:translateY(-2px)}
+  .lg .hd{display:flex;align-items:center;gap:11px;padding-bottom:13px;margin-bottom:13px;
+    border-bottom:1px solid var(--hair)}
+  /* 头像：首字母打底，图片叠在其上 —— 未加载/加载失败都不留空白
+     注意：不能用 opacity:0 隐藏，否则 Chromium 会跳过 lazy 图片的加载 */
+  .lg .hd .av-wrap{position:relative;width:42px;height:42px;flex:none;overflow:hidden;
+    border:1px solid var(--hair-2);background:#0c0f11;
+    clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px)}
+  .lg .hd .av-f{width:100%;height:100%;display:grid;place-items:center;
+    font-size:16px;font-weight:700;color:var(--amber);
+    background:linear-gradient(140deg,#2a2f34,#12161a)}
+  .lg .hd .av{position:absolute;inset:0;width:100%;height:100%;z-index:1;
+    object-fit:cover;object-position:50% 14%}
+  .lg .hd .nm{font-size:14.5px;font-weight:700;letter-spacing:-.01em}
+  .lg .hd .tag{margin-top:3px;font:500 10.5px/1.4 var(--font-data);letter-spacing:.04em;color:var(--ink-3)}
+  .lg .stats{display:grid;gap:13px}
+
+  /* ══════ 排行 ══════ */
+  .rankrow{display:grid;grid-template-columns:repeat(auto-fill,minmax(236px,1fr));gap:20px 22px}
+  .rankrow .stat .v{font-size:22px}
+
+  /* ══════ 最近表现（RP 走势） ══════
+     SVG 用 viewBox 等比缩放（width:100%;height:auto），字号/线宽会跟着一起缩。
+     卡片越窄缩得越狠（窄栏时连 5px 都不到），所以按**卡片实际宽度**放大补偿。
+     用容器查询而不是视口媒体查询 —— 右栏宽度还受左栏和窗口共同影响，
+     单纯看视口判断不准。 */
+  #trendCard{container-type:inline-size}
+  .trend{display:block;width:100%;height:auto}
+  .trend .grid{stroke:rgba(255,255,255,.075);stroke-width:1;stroke-dasharray:2 6}
+  .trend .axis{fill:var(--ink-3);font-family:var(--font-data);font-size:13px;
+    font-variant-numeric:tabular-nums}
+  .trend .line{fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+  .trend .dot{stroke:#0c0f11;stroke-width:2.6}
+  .trend .hit{fill:transparent}
+  /* 赛季分界线 + 顶部标签。
+     注意 SVG 会等比缩放：桌面版卡片固定 730px，缩放系数约 0.9，
+     所以基字号要按「最终落地像素」定 —— 14px × 0.9 ≈ 12.6px，比轴标签(11.7px)略强。 */
+  .trend .seg{stroke:var(--amber-32);stroke-width:1;stroke-dasharray:4 4}
+  .trend .seg-lab{fill:var(--amber);font-family:var(--font-data);font-size:14px;
+    font-weight:700;letter-spacing:.12em}
+  /* 赛季选择器（走势图顶部） */
+  .trend-picker{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+  .trend-picker .lb{font:600 9.5px/1 var(--font-data);letter-spacing:.16em;
+    text-transform:uppercase;color:var(--ink-3);margin-right:2px}
+  .trend-picker .hint{margin-left:4px;font:500 10px/1 var(--font-data);
+    letter-spacing:.04em;color:var(--ink-3);opacity:.8}
+
+  /* 赛季图例：每个赛季的场次与净 RP */
+  .trend-legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+  .trend-legend .lgd{display:inline-flex;align-items:baseline;gap:6px;
+    padding:4px 9px;background:var(--plate-2);border:1px solid var(--hair-2);
+    font:500 11px/1 var(--font-data);color:var(--ink-3)}
+  .trend-legend .lgd b{font-weight:700;color:var(--amber);letter-spacing:.06em}
+  .trend-legend .lgd i{font-style:normal}
+  .trend-legend .lgd em{font-style:normal;font-weight:700}
+  .trend-legend .lgd em.up{color:var(--steel)}
+  .trend-legend .lgd em.dn{color:var(--ember)}
+  @container (max-width: 640px){
+    .trend .axis{font-size:17px}
+    /* 卡片 ≤640 时缩放系数 ≤0.84，18px 落地约 15px */
+    .trend .seg-lab{font-size:18px}
+    .trend .line{stroke-width:3.6}
+    .trend .dot{stroke-width:3.8}
+  }
+  @container (max-width: 420px){     /* 更窄：缩得更狠，Y 轴实在放不下就隐藏 */
+    .trend .y-lab{display:none}
+    .trend .axis-x{font-size:26px}
+    /* 卡片 ≤420 时缩放系数 ≤0.55，24px 落地约 13px */
+    .trend .seg-lab{font-size:24px}
+    .trend .line{stroke-width:5}
+    .trend .dot{stroke-width:5}
+  }
+
+  /* 指标行：走势底部 / 对局汇总 / 常用传奇汇总 共用同一套视觉 */
+  .trend-foot,.mh-sum,.pick-sum{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:15px 20px;
+  }
+  .trend-foot .k,.mh-sum .k,.pick-sum .k{
+    margin-bottom:7px;font:600 9.5px/1 var(--font-data);letter-spacing:.18em;
+    text-transform:uppercase;color:var(--ink-3);
+  }
+  .trend-foot .v,.mh-sum .v,.pick-sum .v{
+    font:700 18px/1.15 var(--font-data);letter-spacing:-.015em;font-variant-numeric:tabular-nums;
+  }
+  .trend-foot .v small,.mh-sum .v small,.pick-sum .v small{
+    margin-left:3px;font:500 11px/1 var(--font-ui);letter-spacing:0;color:var(--ink-3);
+  }
+  .trend-foot{margin-top:17px;padding-top:16px;border-top:1px solid var(--hair)}
+  .mh-sum,.pick-sum{padding-bottom:17px;margin-bottom:16px;border-bottom:1px solid var(--hair)}
+  .trend-foot .v.up,.mh-sum .v.up,.pick-sum .v.up{color:var(--steel)}
+  .trend-foot .v.dn,.mh-sum .v.dn,.pick-sum .v.dn{color:var(--ember)}
+
+  /* ══════ 页面切换（每个可切换页签 = 一个独立页面） ══════ */
+  .page[hidden]{display:none}
+
+  /* ══════ 常用传奇（独立页面） ══════ */
+  /* 汇总行 (.pick-sum) 的视觉由上面 .trend-foot/.mh-sum/.pick-sum 共用规则提供 */
+  .pick-row{position:relative;display:grid;grid-template-columns:42px 1fr 60px 116px;
+    gap:14px;align-items:center;padding:11px 12px;transition:background .14s}
+  .pick-row:hover{background:rgba(255,255,255,.03)}
+  .pick-row:hover::before{transform:scaleY(1)}
+  /* 悬停时左侧长出一条琥珀竖线（和 .stat 的刻度条同一语言） */
+  .pick-row::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:2px;
+    background:var(--amber);transform:scaleY(0);transform-origin:center;
+    transition:transform .22s cubic-bezier(.2,.8,.2,1)}
+  .pick-row+.pick-row{border-top:1px solid var(--hair)}
+  /* 头像：字母兜底 + 立绘叠加（和 Legend 卡片、对局行同一套做法） */
+  .pick-row .av-wrap{position:relative;width:42px;height:42px;flex:none;overflow:hidden;
+    border:1px solid var(--hair-2);background:#0c0f11;
+    clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px)}
+  .pick-row .av-f{width:100%;height:100%;display:grid;place-items:center;font-size:16px;
+    font-weight:700;color:var(--amber);background:linear-gradient(140deg,#2a2f34,#12161a)}
+  .pick-row .av{position:absolute;inset:0;width:100%;height:100%;z-index:1;
+    object-fit:cover;object-position:50% 14%}
+  .pick-row .nm{display:flex;align-items:center;min-width:0;font-size:15px;
+    font-weight:700;letter-spacing:-.01em}
+  .pick-row .nm .i{flex:none;margin-right:8px;font:600 11px/1 var(--font-data);color:var(--ink-3)}
+  .pick-row .nm .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pick-row .mt{margin-top:6px;font:500 10.5px/1.4 var(--font-data);letter-spacing:.03em;
+    color:var(--ink-3);font-variant-numeric:tabular-nums}
+  .pick-row .ct,.pick-row .rp{text-align:right}
+  .pick-row .ct .v{font:700 20px/1 var(--font-data);font-variant-numeric:tabular-nums;color:var(--ink)}
+  .pick-row .ct .k,.pick-row .rp .k{margin-top:5px;
+    font:600 9.5px/1 var(--font-data);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+  .pick-row .rp .v{font:700 16px/1 var(--font-data);font-variant-numeric:tabular-nums}
+  .pick-row .rp .v.up{color:var(--steel)} .pick-row .rp .v.dn{color:var(--ember)}
+  .badge-main{display:inline-block;flex:none;margin-left:8px;padding:2px 6px;
+    font:700 9.5px/1 var(--font-data);letter-spacing:.14em;color:#0b0d10;background:var(--amber)}
+  /* 主力行：序号变金色（窄屏靠这个认主力，不用徽章占地方） */
+  .pick-row.is-main .nm .i{color:var(--amber)}
+  .pick-row.is-main{background:linear-gradient(90deg,var(--amber-08),transparent 62%)}
+  @media(max-width:720px){
+    /* 窄屏：隐藏「场次」列和「主力」徽章（徽章会把传奇名挤到截断），
+       用金色序号代替，并按紧内边距把空间全让给名字 */
+    html:not(.desk) .pick-row{grid-template-columns:42px 1fr 92px;gap:11px;padding:11px 4px}
+    html:not(.desk) .pick-row .ct{display:none}
+    html:not(.desk) .pick-row .badge-main{display:none}
+    html:not(.desk) .pick-row .nm .i{margin-right:6px}
+    html:not(.desk) .pick-row::before{display:none}
+  }
+
+  /* ══════ 对局记录（Session Overview） ══════ */
+  /* 汇总行 (.mh-sum) 的视觉由 .trend-foot/.mh-sum/.pick-sum 共用规则提供 */
+  .mh-group+.mh-group{margin-top:16px}
+  .mh-split{display:flex;align-items:center;gap:10px;padding-bottom:8px;
+    font:600 10px/1 var(--font-data);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+  .mh-split .sp{color:var(--amber)}
+  .mh-split::after{content:'';flex:1;height:1px;
+    background:linear-gradient(90deg,var(--hair-2),transparent)}
+  /* 赛季组头的第二行：相对时间 + 时间范围（比组头更弱） */
+  .mh-range{padding:0 0 9px 2px;
+    font:500 10.5px/1.5 var(--font-data);letter-spacing:.04em;color:var(--ink-3);
+    font-variant-numeric:tabular-nums}
+  /* 相对时间稍强一点，便于一眼抓到「最近一次多久前」 */
+  .mh-range b{color:var(--ink-2);font-weight:700}
+  /* 列宽：头像 / 传奇+地图(吃剩余) / 击杀伤害(定宽，避免桌面下被拉出大空洞) / RP
+     定宽比 1fr 好：各行数据能纵向对齐，不会因内容长短不同而错位。
+     击杀伤害列 210px：TRN 会话的伤害可达 7 位（如 279,773）。 */
+  .mrow{position:relative;display:grid;grid-template-columns:38px minmax(0,1fr) 210px 104px;
+    gap:14px;align-items:center;padding:9px 10px;transition:background .14s}
+  .mrow:hover{background:rgba(255,255,255,.03)}
+  .mrow+.mrow{border-top:1px solid var(--line)}
+  /* 头像：字母兜底 + 立绘叠加，和上面 Legend 卡片同一套做法 */
+  .mrow .av-wrap{position:relative;width:38px;height:38px;flex:none;overflow:hidden;
+    border:1px solid var(--hair-2);background:#0c0f11;
+    clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+  .mrow .av-f{width:100%;height:100%;display:grid;place-items:center;font-size:14px;
+    font-weight:700;color:var(--amber);background:linear-gradient(140deg,#2a2f34,#12161a)}
+  .mrow .av{position:absolute;inset:0;width:100%;height:100%;z-index:1;
+    object-fit:cover;object-position:50% 14%}
+  /* 相对时间：行的第一行标签（对齐 tracker.gg 的 "1 day ago"）。
+     用户反馈过两次「看不到对局时间」—— 所以：
+       ① 放在整行的**最上方**，不埋在灰色 meta 里；
+       ② 相对时间是**亮色加粗**（--ink），后面跟一个暗色的绝对日期做参照，双保险。
+     tracker.gg 只给相对时间；我们多给一个绝对日期，因为用户明确问过「当天还是几天前」，
+     两个一起看最不容易误解。 */
+  .mrow .when{display:flex;align-items:baseline;gap:7px;
+    font:600 11.5px/1.35 var(--font-data);letter-spacing:.04em;
+    color:var(--ink-3);margin-bottom:3px;white-space:nowrap;overflow:hidden}
+  .mrow .when b{color:var(--ink);font-weight:700;flex:none}
+  .mrow .when span{font-size:10.5px;color:var(--ink-3);flex:none}
+  .mrow .nm{font-size:14px;font-weight:600;letter-spacing:-.01em;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mrow .meta{margin-top:3px;font:500 10.5px/1.4 var(--font-data);letter-spacing:.03em;color:var(--ink-3);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* 右对齐：让「击杀/伤害」和右侧的 RP 两列贴合成一个紧凑数据块，
+     否则宽卡片下名字与数值之间会空出一大片。
+     每格定宽 + 数字 margin-left:auto → 跨行数字按右边缘对齐（tabular-nums 配合） */
+  /* 左对齐（不是 flex-end）：因为每行的格数会变（有的会话只有击杀、没有伤害），
+     flex-end 会让「击杀」在单格行里跑到最右，跨行的标签位置就对不上了。
+     固定容器宽 + 左对齐 ⇒ 首格位置恒定，标签始终纵向对齐。 */
+  .mrow .ks{display:flex;gap:14px;justify-content:flex-start;
+    font-variant-numeric:tabular-nums}
+  /* nowrap 必须加：TRN 的伤害可达 7 位（279,773），
+     否则标签会被挤成竖排（「伤
+害」）。96px 是按「伤害 + 7 位数」留的余量。 */
+  .mrow .ks>span{display:inline-flex;align-items:baseline;gap:6px;width:96px;
+    white-space:nowrap}
+  .mrow .ks>span>b{margin-left:auto;text-align:right}
+  /* 无追踪数据的场次（stats 为空对象）用极淡的占位符，保持网格不断裂 */
+  .mrow .ks.na{opacity:.36}
+  .mrow .ks.na>span{width:auto}
+  .mrow .ks .k{margin-right:5px;font:600 9.5px/1 var(--font-data);letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink-3)}
+  .mrow .ks b{font:600 13px/1 var(--font-data)}
+  .mrow .rp{text-align:right;font-variant-numeric:tabular-nums}
+  .mrow .chg{font:700 15px/1.2 var(--font-data);letter-spacing:-.01em}
+  .mrow .chg.up{color:var(--steel)} .mrow .chg.dn{color:var(--ember)} .mrow .chg.na{color:var(--ink-3)}
+  .mrow .rpv{margin-top:3px;font:500 10.5px/1.4 var(--font-data);color:var(--ink-3)}
+  .mrow .rpv img{width:15px;height:15px;vertical-align:-3px;margin-right:5px;object-fit:contain;
+    opacity:.85}
+  /* 段位名（跟在 RP 后面，弱化显示，别抢 RP 的视觉权重） */
+  .mrow .rpv .rk{margin-left:5px;font:600 9.5px/1 var(--font-data);letter-spacing:.06em;
+    text-transform:uppercase;color:var(--ink-3);opacity:.9}
+  .badge-win{display:inline-block;margin-left:7px;padding:2px 5px;vertical-align:1.5px;
+    font:700 9.5px/1 var(--font-data);letter-spacing:.14em;
+    color:#0b0d10;background:var(--amber)}
+  /* ── TRN 会话行：必须一眼看出「这不是单场」 ── */
+  .badge-sess{display:inline-block;margin-left:7px;padding:2px 5px;vertical-align:1.5px;
+    font:700 9.5px/1 var(--font-data);letter-spacing:.14em;color:var(--amber);
+    border:1px solid var(--amber-32);background:var(--amber-08)}
+  /* ── 排位 / 匹配 徽标 ── */
+  .badge-pl{display:inline-block;margin-left:7px;padding:2px 5px;vertical-align:1.5px;
+    font:700 9.5px/1 var(--font-data);letter-spacing:.14em}
+  .badge-pl.ranked{color:#0b0d10;background:var(--amber)}
+  .badge-pl.pubs{color:var(--steel);border:1px solid var(--steel-32);background:rgba(94,208,216,.09)}
+  .badge-pl.unknown{color:var(--ink-3);border:1px solid var(--hair-2)}
+  /* 排位行左侧一条琥珀细线，扫一眼就能分出两类 */
+  .mrow.is-ranked::before{content:'';position:absolute;left:0;top:7px;bottom:7px;width:2px;
+    background:var(--amber);opacity:.5}
+  /* 筛选条（类型/赛季） */
+  .mh-filter{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+  .mh-filter .lb{font:600 9.5px/1 var(--font-data);letter-spacing:.16em;
+    text-transform:uppercase;color:var(--ink-3);margin-right:2px}
+  .mh-filter .hint{margin-left:4px;font:500 10px/1 var(--font-data);
+    letter-spacing:.04em;color:var(--ink-3);opacity:.8}
+  /* 当前赛季（独立一行，按系统日期算出、与 tracker.gg 交叉验证）。
+     不放进 .mh-filter 的 flex 行 —— 那样会被赛季按钮挤压截断。 */
+  .season-now{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:-6px 0 14px;
+    padding-left:2px}
+  .season-now .cs{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;
+    font:500 11.5px/1 var(--font-data);letter-spacing:.03em;color:var(--ink-3)}
+  .season-now .cs b{color:var(--steel);font-weight:700;letter-spacing:.06em;font-size:12.5px}
+  .season-now .cs.warn{color:var(--amber)}
+  /* 「现在是这个赛季」的小圆点 */
+  .now-dot{display:inline-block;width:5px;height:5px;margin-left:5px;border-radius:50%;
+    vertical-align:1px;background:var(--steel)}
+  /* 会话行整体降低对比度 + 左侧琥珀细线，和逐场行区分开 */
+  .mrow.trn{background:linear-gradient(90deg,rgba(255,159,40,.045),transparent 55%)}
+  .mrow.trn .nm{color:var(--ink-2)}
+  .mh-split .sp.trn{color:var(--amber)}
+  /* 来源说明：小字，跟在组头下面 */
+  .src-note{margin:2px 0 8px;padding-left:2px;font:500 11px/1.6 var(--font-data);
+    color:var(--ink-3)}
+  .src-note b{color:var(--ink-2)}
+  /* ── 对局行第二行：把该场全部数据平铺出来 ──
+     占 2~4 列（跳过头像列），自动换行，不参与第一行的列宽分配 */
+  .mrow .extra{
+    grid-column:2/-1;display:flex;flex-wrap:wrap;align-items:baseline;
+    gap:5px 16px;margin-top:8px;padding-top:8px;
+    border-top:1px dashed var(--hair);
+  }
+  .mrow .extra .ex{display:inline-flex;align-items:baseline;gap:6px;
+    font-variant-numeric:tabular-nums}
+  .mrow .extra .ex .k{
+    font:600 9.5px/1 var(--font-data);letter-spacing:.1em;text-transform:uppercase;
+    color:var(--ink-3);white-space:nowrap;
+  }
+  .mrow .extra .ex b{font:600 12px/1 var(--font-data);color:var(--ink-2)}
+  /* 「追踪器」分组：用左侧竖线隔开，琥珀标签 + 原始键名列表 */
+  .mrow .extra .trk{display:inline-flex;align-items:baseline;flex-wrap:wrap;
+    gap:5px 8px;padding-left:14px;border-left:1px solid var(--hair-2)}
+  .mrow .extra .trk>.lh{
+    font:700 9.5px/1 var(--font-data);letter-spacing:.16em;text-transform:uppercase;
+    color:var(--amber);
+  }
+  .mrow .extra .trk>.cn{font:600 10px/1 var(--font-data);color:var(--ink-3)}
+  @media(max-width:720px){
+    html:not(.desk) .mrow{grid-template-columns:38px minmax(0,1fr) 92px;gap:10px}
+    html:not(.desk) .mrow .ks{display:none}
+  }
+
+  /* ══════ 数据对比（ALS vs TRN） ══════ */
+  /* 结论条：ok = 钢青，warn = 琥珀 */
+  .verdict{display:flex;gap:11px;align-items:flex-start;padding:13px 15px;margin-bottom:18px;
+    background:var(--plate-2);border:1px solid var(--hair-2);border-left-width:3px;
+    font:500 12.5px/1.7 var(--font-ui);color:var(--ink-2)}
+  .verdict::before{content:'';flex:none;width:6px;height:6px;margin-top:6px;border-radius:50%;
+    background:var(--steel)}
+  .verdict.warn::before{background:var(--amber)}
+  .verdict.warn{border-left-color:var(--amber-32)}
+  .verdict.ok{border-left-color:var(--steel-32)}
+  /* 源徽标 */
+  .src{display:inline-block;padding:2px 6px;font:700 9.5px/1 var(--font-data);
+    letter-spacing:.12em;text-transform:uppercase}
+  .src.als{color:var(--steel);background:rgba(94,208,216,.1);border:1px solid var(--steel-32)}
+  .src.trn{color:var(--amber);background:var(--amber-08);border:1px solid var(--amber-32)}
+  /* 新鲜度：两个源并排 */
+  .fresh{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+  .fresh .fbox{padding:14px 15px;background:var(--plate-2);border:1px solid var(--hair)}
+  .fresh .fbox.trn{border-color:var(--amber-32)}
+  .fresh .fk{display:flex;align-items:center;gap:8px;margin-bottom:10px;
+    font:600 9.5px/1 var(--font-data);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+  .fresh .fd{font:700 19px/1 var(--font-data);letter-spacing:-.015em;font-variant-numeric:tabular-nums}
+  .fresh .fl{margin-top:8px;font-size:12px;color:var(--ink-2)}
+  .fresh .fl b{color:var(--ink);font-weight:650}
+  .gap-note{margin:-6px 0 20px;text-align:center;
+    font:600 11px/1.6 var(--font-data);letter-spacing:.05em;color:var(--amber)}
+  /* 对比表 */
+  .ctab{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  .ctab th,.ctab td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--hair)}
+  .ctab th{font:600 9.5px/1 var(--font-data);letter-spacing:.16em;text-transform:uppercase;
+    color:var(--ink-3);border-bottom-color:var(--hair-2)}
+  .ctab td{font:500 12.5px/1.5 var(--font-data);color:var(--ink-2)}
+  .ctab td:first-child{font-family:var(--font-ui);font-size:13px;color:var(--ink);white-space:nowrap}
+  .ctab td.num{text-align:right;font-size:14px;font-weight:700;color:var(--ink)}
+  .ctab tr:last-child td{border-bottom:0}
+  .ctab .yes{color:var(--steel)}
+  .ctab .no{color:var(--ember)}
+  .ctab .same{color:var(--steel);font-weight:700}
+  .ctab .diff{color:var(--amber);font-weight:700}
+  .ctab .na{color:var(--ink-3)}
+  .ctab .note{margin-top:3px;font:500 10px/1.4 var(--font-data);color:var(--ink-3)}
+  /* 区块小标题（h3）：琥珀竖条 + 细线收尾，与面板标题同一语言但更轻 */
+  .sub-h{display:flex;align-items:center;gap:10px;margin:22px 0 10px;
+    font:600 11px/1 var(--font-data);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-2)}
+  .sub-h::before{content:'';width:3px;height:12px;background:var(--amber)}
+  .sub-h::after{content:'';flex:1;height:1px;
+    background:linear-gradient(90deg,var(--hair-2),transparent)}
+  code{padding:1px 5px;font:600 11px/1.5 var(--font-data);color:var(--amber);
+    background:var(--amber-08);border:1px solid var(--amber-32)}
+  /* 可复制脚本块 */
+  .snippet{position:relative;margin-bottom:4px}
+  .snippet pre{
+    margin:0;padding:14px 15px;overflow-x:auto;
+    font:500 11.5px/1.75 var(--font-data);color:var(--ink-2);white-space:pre;
+    background:#0a0c0e;border:1px solid var(--hair-2);border-left:3px solid var(--amber);
+  }
+  .snippet .tbtn{position:absolute;top:9px;right:9px}
+  @media(max-width:720px){
+    .fresh{grid-template-columns:1fr}
+    .ctab th:nth-child(3),.ctab td:nth-child(3){display:none}
+  }
+
+  footer{
+    position:relative;z-index:1;margin-top:32px;padding-top:16px;border-top:1px solid var(--hair);
+    text-align:center;color:var(--ink-3);
+    font:500 10.5px/1.95 var(--font-data);letter-spacing:.05em;
+  }
+  footer b{color:var(--ink-2);font-weight:600}
+  footer .ver{color:var(--amber);letter-spacing:.1em}
+
+  /* 尊重系统的「减弱动效」设置 */
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{
+      animation-duration:.001s!important;animation-iteration-count:1!important;
+      transition-duration:.001s!important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="hero-lay hero-lay-grid" aria-hidden="true"></div>
+    <div class="hero-lay hero-lay-glow" aria-hidden="true"></div>
+    <div class="hero-lay hero-lay-scan" aria-hidden="true"></div>
+    <div class="hero-inner">
+      <div id="avatar"><div class="avatar-fallback">🏔</div></div>
+      <div class="who">
+        <div class="eyebrow">Operator Dossier</div>
+        <h1 id="pname">Apex 战绩查询</h1>
+        <div class="chips" id="pchips">
+          <span class="chip">输入 UID 或玩家名开始查询</span>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <div class="readout">
+        <div class="readout-k">Link Status</div>
+        <span id="status">就绪</span>
+      </div>
+    </div>
+    <!-- 页签由 JS 按 TABS 注册表生成：关掉的区块不渲染按钮，
+         避免留下点不动的灰色按钮（看着像功能坏了） -->
+    <nav class="tabs" id="tabs"></nav>
+    <div class="tape" aria-hidden="true"></div>
+  </header>
+
+  <div class="search">
+    <div class="row">
+      <label class="field">
+        <span class="field-k">UID</span>
+        <input id="uid" placeholder="推荐，改名不失效" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="field-k">玩家名</span>
+        <input id="name" value="bluekinger" placeholder="如 bluekinger" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="field-k">平台</span>
+        <select id="platform" title="平台">
+          <option value="PC">PC</option>
+          <option value="PS4">PS4</option>
+          <option value="X1">Xbox</option>
+        </select>
+      </label>
+      <button class="go" id="go"><i class="go-glyph"></i>执行查询</button>
+    </div>
+  </div>
+
+  <div class="note" id="hint">填 UID <b>或</b> 玩家名，按 <b>Enter</b> 也能查。查询只读公开战绩，不写入任何文件。</div>
+  <div id="errbox"></div>
+  <div id="skeleton">
+    <div class="sk-cols">
+      <div>
+        <div class="sk-card"><div class="sk" style="height:15px;width:52%;margin-bottom:18px"></div>
+          <div class="sk" style="height:62px;margin-bottom:12px"></div>
+          <div class="sk" style="height:11px;width:70%"></div></div>
+        <div class="sk-card"><div class="sk" style="height:15px;width:44%;margin-bottom:18px"></div>
+          <div class="sk-grid"><div class="sk" style="height:36px"></div><div class="sk" style="height:36px"></div>
+            <div class="sk" style="height:36px"></div><div class="sk" style="height:36px"></div></div></div>
+      </div>
+      <div>
+        <div class="sk-card">
+          <div class="sk" style="height:15px;width:34%;margin-bottom:18px"></div>
+          <div class="sk-grid" style="margin-bottom:18px">
+            <div class="sk" style="height:58px"></div><div class="sk" style="height:58px"></div>
+            <div class="sk" style="height:58px"></div><div class="sk" style="height:58px"></div></div>
+          <div class="sk-grid"><div class="sk" style="height:44px"></div><div class="sk" style="height:44px"></div></div>
+        </div>
+        <div class="sk-card">
+          <div class="sk" style="height:15px;width:28%;margin-bottom:18px"></div>
+          <div class="sk-grid"><div class="sk" style="height:48px"></div><div class="sk" style="height:48px"></div>
+            <div class="sk" style="height:48px"></div><div class="sk" style="height:48px"></div>
+            <div class="sk" style="height:48px"></div><div class="sk" style="height:48px"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="result"></div>
+
+  <footer>
+    数据来源：<b>tracker.gg</b>（浏览器采集）· 可选 Apex Legends Status<br>
+    徽章与传奇图片来自上述站点的公开 CDN · 本页由 server.mjs 提供，仅监听本机<br>
+    <span class="ver">Apex 战绩查询 v1.0</span>
+  </footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = (n) => {
+  if (n == null || n === '') return '—';
+  // ALS 的排名是带逗号的字符串（"557,963"），要先去逗号再解析
+  const v = typeof n === 'number' ? n : Number(String(n).replace(/,/g, ''));
+  return Number.isFinite(v) ? v.toLocaleString('en-US') : String(n);
+};
+/* 对局的 stats 是「字符串化的数字」（"840" / "1,024"），统一转成 number */
+const toNum = (v) => {
+  const n = Number(String(v ?? '').replace(/,/g, ''));
+  return Number.isFinite(n) ? n : 0;
+};
+const initial = (s) => esc(String(s ?? '?').trim().charAt(0).toUpperCase());
+
+/* ALS 的状态文案形如 "Online - In Lobby" / "Offline or invite only"，
+   不能直接 includes('online') —— "Offline" 里也含 "nline"，要按开头判断 */
+const isOnline = (status) => /^\s*(online|in game|in lobby|ingame)\b/i.test(String(status ?? ''));
+
+/* 排序基准：只认 BR Kills，拿不到就返回 null（排在最后）。
+   绝不能回退到其它指标 —— 例如 Revenant 挂的是 BR Damage 238,303，
+   和 Valkyrie 的 BR Kills 1,057 单位不同，混排会把它错误地排到第一名。 */
+function legendKills(l) {
+  if (l.__kills != null) return l.__kills;
+  const s = l.stats ?? {};
+  for (const k of Object.keys(s)) if (k === 'BR Kills' && s[k]?.value != null) return s[k].value;
+  return null;
+}
+
+/* 段位徽章：diamond4 → api.mozambiquehe.re/assets/ranks/diamond4.png */
+/* 段位徽章（ALS 源）：diamond4 → api.mozambiquehe.re/assets/ranks/diamond4.png
+   ⚠️ 必须归一化：tracker.gg 的段位名是 `"Diamond 4"`（带空格），
+   直接拼会得到 `Diamond 4.png` → 404（实测踩到）。 */
+const rankImg = (tier) => {
+  if (!tier) return '';
+  const slug = String(tier).toLowerCase().replace(/[^a-z0-9]/g, '');
+  return slug ? `https://api.mozambiquehe.re/assets/ranks/${slug}.png` : '';
+};
+
+/* 传奇头像：Valkyrie → .../humanesas/Valkyrie.webp；Mad Maggie → Mad-maggie.webp */
+function legendImg(name) {
+  if (!name || name === 'Global') return '';
+  const slug = String(name).toLowerCase().replace(/^./, (c) => c.toUpperCase()).replace(/ /g, '-');
+  return `https://apexlegendsstatus.com/assets/legends/humanesas/${encodeURIComponent(slug)}.webp`;
+}
+
+/* ══════════ 传奇中文名 ══════════
+   采用**国服简中官方译名**（与 biligame 的 Apex 维基一致，逐条核对过）。
+   注意：
+   · 这里只影响**显示**。legendImg() 必须继续用英文原名拼 slug，否则图片 404。
+   · 数据（legendPrimaryStats / stats / matches）的键始终是英文原名，不要拿中文名去查。
+   · ⚠️ 两个译名存在来源冲突，已标在行内注释里，若与游戏内不一致直接改这里即可。 */
+const LEGEND_CN = {
+  // 初代 8 位
+  Wraith: '恶灵',
+  Bloodhound: '寻血猎犬',
+  Gibraltar: '直布罗陀',
+  Lifeline: '命脉',
+  Pathfinder: '探路者',
+  Bangalore: '班加罗尔',
+  Caustic: '侵蚀',
+  Mirage: '幻象',
+  // 后续赛季
+  Octane: '动力小子',
+  Wattson: '沃特森',
+  Crypto: '密客',
+  Revenant: '亡灵',
+  Loba: '萝芭',
+  Rampart: '兰伯特',
+  Horizon: '地平线',
+  Fuse: '暴雷',
+  Valkyrie: '瓦尔基里',
+  Seer: '希尔',
+  Ash: '艾许',
+  'Mad Maggie': '疯玛吉',
+  Newcastle: '纽卡斯尔',
+  Vantage: '万蒂奇',
+  Catalyst: '卡特莉丝',
+  Ballistic: '弹道',
+  Conduit: '导管',
+  Alter: '变幻',
+  // ⚠️ 冲突项：维基百科作「雀影」，biligame 维基作「琉雀」——此处取后者
+  Sparrow: '琉雀',
+  // ⚠️ 冲突项：较新传奇（第 29 赛季），暂用维基百科的「艾瑟儿」
+  Axle: '艾瑟儿',
+};
+
+/* 英文名 → 中文名。表里没有的原样返回（新传奇不会变成空白） */
+const legendCN = (name) => LEGEND_CN[name] ?? name;
+
+/* 头像里的字母兜底：中文名就取首字，英文名取首字母大写 */
+const legendInitial = (name) => esc(String(legendCN(name) ?? '?').trim().charAt(0).toUpperCase());
+
+/* 排名百分位 → 进度条宽度（Top 8.5% → 91.5% 长度） */
+const meterWidth = (pct) => {
+  const p = parseFloat(pct);
+  if (!Number.isFinite(p)) return null;
+  return Math.max(2, Math.min(100, 100 - p));
+};
+
+/* 单个统计项：竖线 + 标签 + 大数值 + Top% */
+function stat({ label, value, pct, pos, cls = '' }) {
+  const pctTxt = pct ? `Top ${pct}%${pos ? ` · #${fmt(pos)}` : ''}` : (pos ? `#${fmt(pos)}` : '');
+  return `<div class="stat ${cls}">
+    <span class="l" title="${esc(label)}">${esc(label)}</span>
+    <span class="v">${value}</span>
+    ${pctTxt ? `<span class="p">${esc(pctTxt)}</span>` : ''}
+  </div>`;
+}
+
+/* 段位大展示块 */
+function rankBlock(r, pos) {
+  // 优先用后端给的徽章图（tracker.gg 的 trackercdn，与段位名严格对应）；
+  // 没有时才按段位名自己拼 ALS 的图。
+  const img = r.rankTierImg || rankImg(r.rankTier);
+  const tier = r.tier ?? r.rankTier ?? '—';
+  const pct = r.rankPercentile;
+  const mw = meterWidth(pct);
+  /* 峰值 RP：tracker.gg 提供「本赛季峰值」与「历史峰值」，ALS 没有这两项 */
+  const seasonPeak = r.peakRankScore;
+  const lifePeak = r.lifetimePeakRankScore;
+  const shown = Number.isFinite(lifePeak) ? lifePeak : seasonPeak;
+  const peakTxt = shown
+    ? `${Number.isFinite(lifePeak) && lifePeak !== seasonPeak ? '历史峰值' : '峰值'} ${fmt(shown)} RP` +
+      (Number.isFinite(seasonPeak) && lifePeak !== seasonPeak ? `　·　本赛季 ${fmt(seasonPeak)}` : '')
+    : '';
+  return `<div class="ranknow">
+    ${img ? `<img src="${img}" alt="${esc(tier)}" onerror="this.remove()">` : ''}
+    <div>
+      <div class="nm">${esc(tier)}</div>
+      <div class="rp">${fmt(r.rankScore)}<sup>RP</sup></div>
+      <div class="pct">${pct ? `Top ${pct}%` : ''}${pos ? ` · #${fmt(pos)}` : ''}</div>
+      ${peakTxt ? `<div class="pct peak" title="tracker.gg 提供的峰值数据（ALS 没有）">${esc(peakTxt)}</div>` : ''}
+      ${mw != null ? `<div class="meter" style="max-width:190px"><i style="width:${mw}%"></i></div>` : ''}
+    </div>
+  </div>`;
+}
+
+/* ══════════ 显示开关 ══════════
+   当前阶段：只保留上方（hero / 搜索栏 / 左栏），
+   **左栏以下的所有功能区块先全部屏蔽**，等确定展示方式后逐个重开。
+   每块标记都还在模板里，把 false 改回 true 即可恢复，不用重写。 */
+const SHOW_ACCOUNT = true;    // 左栏「Account」卡片（等级 / 转生 / 传奇数 / 追踪器）
+const SHOW_LIFETIME = false;  // 右栏「Lifetime Stats」
+const SHOW_TREND = true;      // 右栏「最近表现」（RP 走势，需对局数据）
+const SHOW_RANK = false;      // 传奇击杀排行
+const SHOW_LEGENDS = false;   // Legends 卡片网格
+const SHOW_MATCHES = true;    // 对局记录列表（关掉后仍可为走势图抓取数据）
+const SHOW_PICKS = true;      // 「常用传奇」独立页面（只读对局缓存，不发额外请求）
+/* 「数据对比」独立页面：走 --provider both（ALS 聚合 + TRN 对局 + 交叉对比）。
+   注意 TRN 有限流（10 次/分钟），所以**只在用户点这个页签时才发请求**，不随主查询自动拉。
+   未配置 TRN_API_KEY 时不报错：仍会展示 ALS 侧的对比结论（含数据新鲜度差距）。 */
+const SHOW_COMPARE = true;
+
+/* 对局数据（最近表现 + 对局记录 + 常用传奇共用同一次请求）是否需要抓 */
+const NEED_MATCHES = () => SHOW_TREND || SHOW_MATCHES || SHOW_PICKS;
+
+/* 主渲染 ── */
+function render(j) {
+  const r = j.record ?? {};
+  const pos = j.rankPosition;
+  const gl = r.global ?? {};
+  /* 统一口径：过滤掉 ALS 的 Global 聚合项，全页只用这个数量（此前 Account 显示 28、Legends 显示 27） */
+  const legends = (j.legends ?? [])
+    .filter((l) => l.legend !== 'Global')
+    .map((l) => {
+      const p = r.legendPrimaryStats?.[l.legend];
+      return { ...l, __kills: p?.isKills ? p.value : null };
+    })
+    .sort((a, b) => (legendKills(b) ?? -1) - (legendKills(a) ?? -1)
+      || legendCN(a.legend).localeCompare(legendCN(b.legend), 'zh'));  // 并列时按中文名，与 DOM 重排口径一致
+  const legendCount = legends.length;
+
+  /* Hero */
+  const alias = r.name ?? r.queried;
+  $('pname').textContent = alias ?? '—';
+  document.title = alias ? `${alias} · Apex 战绩` : 'Apex 战绩查询';
+  const chips = [];
+  // tracker.gg 的 uid 是字符串 ID（如 bluekinger），只有纯数字才是真正的 UID
+  if (r.uid) chips.push(`<span class="chip">${/^\d+$/.test(r.uid) ? 'UID' : 'EA ID'} ${esc(r.uid)}</span>`);
+  if (r.platform) chips.push(`<span class="chip">${esc(r.platform)}</span>`);
+  if (j.status) chips.push(`<span class="chip${isOnline(j.status) ? ' live' : ''}">${esc(j.status)}</span>`);
+  if (r.prestige) chips.push(`<span class="chip">${esc(r.prestige)}</span>`);
+  $('pchips').innerHTML = chips.join('') || '<span class="chip">—</span>';
+
+  /* 头像：优先用击杀最高的传奇，退回首字母
+     注意：这里刻意不加 decoding="async" —— 实测会让浏览器延迟栅格化，
+     27 张图里大部分迟迟不绘制、一直露着底下的字母兜底 */
+  const topImg = legendImg(legends[0]?.legend);
+  $('avatar').innerHTML = `<div class="avatar-wrap">
+      <div class="avatar-fallback">${initial(alias)}</div>
+      ${topImg ? `<img class="av" src="${topImg}" alt="" onerror="this.remove()">` : ''}
+    </div>`;
+
+  /* 左栏 */
+  const aside = `
+    <div class="card">
+      <h2><span class="ico"></span><span class="code">Rating</span>Current Rating</h2>
+      ${rankBlock(r, pos)}
+      <hr class="sep">
+      <div class="mini">
+        <div>
+          <div class="k">Alias</div>
+          <div class="v">${esc(alias ?? '—')}</div>
+          ${r.queried && r.queried !== alias ? `<div class="k" style="margin-top:3px">查询名：${esc(r.queried)}</div>` : ''}
+        </div>
+      </div>
+    </div>
+    ${SHOW_ACCOUNT ? `
+    <div class="card">
+      <h2><span class="ico"></span><span class="code">Profile</span>Account</h2>
+      <div class="two">
+        <div><div class="k">等级</div><div class="v">${r.level ?? '—'}</div></div>
+        <div><div class="k">转生</div><div class="v">${esc(r.prestige ?? '—')}</div></div>
+        <div><div class="k">传奇数</div><div class="v">${legendCount}</div></div>
+        <div style="grid-column:1/-1"><div class="k">追踪器</div><div class="v" style="font-size:13px;font-weight:550">${esc(j.trackers ?? '—')}</div></div>
+      </div>
+    </div>` : ''}`;
+
+  /* 主区 */
+  const gk = gl['Career Kills'], gw = gl['Career Wins'], gr = gl['Career Revives'];
+  const main = !SHOW_LIFETIME ? '' : `
+    <div class="card">
+      <h2><span class="ico"></span><span class="code">All-time</span>Lifetime Stats<span class="sub">全平台累计</span></h2>
+      <div class="statrow">
+        ${gk ? stat({ label: 'Kills', value: esc(gk.displayValue), pct: gk.percentile, pos: gk.position, cls: 'big' }) : ''}
+        ${gw ? stat({ label: 'Wins', value: esc(gw.displayValue), pct: gw.percentile, pos: gw.position, cls: 'big' }) : ''}
+        ${gr ? stat({ label: 'Revives', value: esc(gr.displayValue), pct: gr.percentile, pos: gr.position, cls: 'big' }) : ''}
+        ${stat({ label: 'Level', value: r.level ?? '—', pct: null, pos: null, cls: 'big amber' })}
+      </div>
+      <div class="statgrid">
+        ${Object.entries(gl).filter(([k]) => !['Career Kills', 'Career Wins', 'Career Revives'].includes(k))
+          .map(([k, v]) => stat({ label: k, value: esc(v.displayValue), pct: v.percentile, pos: v.position })).join('')}
+        ${stat({ label: 'Legends Played', value: legendCount })}
+        ${r.rankScore != null ? stat({ label: 'Rank Score', value: fmt(r.rankScore), pct: r.rankPercentile, pos, cls: 'amber' }) : ''}
+      </div>
+    </div>`;
+
+  /* 排行（只排 BR Kills，单位一致才可比） */
+  const lk = r.legendPrimaryStats ?? {};
+  const ranked = Object.entries(lk).filter(([, v]) => v.isKills).sort((a, b) => b[1].value - a[1].value);
+  const rankCard = SHOW_RANK && ranked.length >= 2 ? `
+    <div class="card" id="rankCard">
+      <h2><span class="ico"></span><span class="code">Kills</span>传奇击杀排行<span class="sub">Top ${Math.min(12, ranked.length)} · 按 BR Kills</span></h2>
+      <div class="rankrow">
+        ${ranked.slice(0, 12).map(([n, v], i) => stat({
+          label: `${i + 1}. ${legendCN(n)}`, value: fmt(v.value), pct: null, pos: null,
+        })).join('')}
+      </div>
+    </div>` : '';
+
+  /* Legend 卡片（默认按击杀降序；data-v / data-n 供切换排序复用，避免重排 DOM） */
+  const legendCards = !SHOW_LEGENDS ? '' : legends.map((l) => {
+    const keys = Object.keys(l.stats ?? {}).filter((k) => l.stats[k]?.value != null);
+    if (!keys.length) return '';
+    const img = legendImg(l.legend);
+    const kills = legendKills(l);
+    const stats = keys.map((k) => {
+      const v = l.stats[k];
+      return stat({ label: k, value: esc(v.displayValue), pct: v.percentile, pos: v.position });
+    }).join('');
+    /* data-n 用中文名：切「按名称」时要按显示出来的名字排，否则用户看不出规律 */
+    return `<div class="lg" data-v="${kills ?? -1}" data-n="${esc(legendCN(l.legend))}">
+      <div class="hd">
+        <div class="av-wrap">
+          <div class="av-f">${legendInitial(l.legend)}</div>
+          ${img ? `<img class="av" src="${img}" alt="" onerror="this.remove()">` : ''}
+        </div>
+        <div>
+          <div class="nm" title="${esc(l.legend)}">${esc(legendCN(l.legend))}</div>
+          <div class="tag">${keys.length} 项追踪数据${kills == null ? ' · 未挂 BR Kills' : ''}</div>
+        </div>
+      </div>
+      <div class="stats">${stats}</div>
+    </div>`;
+  }).join('');
+
+  /* 右栏：Lifetime Stats（已屏蔽）+ 最近表现（惰性填充，先给骨架占位） */
+  const rightCol = main + (SHOW_TREND
+    ? `<div class="card" id="trendCard">${trendHead('加载中…')}
+         <div class="sk" style="height:172px"></div></div>`
+    : '');
+
+  /* 拆成两个独立页面：第一页 Overview，「常用传奇」另起一页 */
+  const overview =
+    `<div class="cols"><aside>${aside}</aside>${rightCol ? `<div>${rightCol}</div>` : ''}</div>` +
+    (rankCard ? rankCard : '') +
+    (legendCards ? `<div class="card" id="legendCard">
+      <h2><span class="ico"></span><span class="code">Roster</span>Legends
+        <span class="sub">${legendCount} 个传奇 · 数值下方为百分位</span>
+        <div class="tools">
+          <button class="tbtn on" data-sort="kills">按击杀</button>
+          <button class="tbtn" data-sort="name">按名称</button>
+        </div>
+      </h2>
+      <div class="legends" id="legendGrid">${legendCards}</div>
+    </div>` : '');
+
+  $('result').innerHTML =
+    `<div class="page" id="pageOverview">${overview}</div>` +
+    (SHOW_PICKS ? `<div class="page" id="pagePicks" hidden><div class="card" id="picksCard"></div></div>` : '') +
+    (SHOW_COMPARE ? `<div class="page" id="pageCompare" hidden><div class="card" id="compareCard"></div></div>` : '');
+  $('result').classList.add('on');
+  bindLegendSort();
+  buildTabs(); // 重建页签：数据变了，区块可能出现/消失
+  /* 同一个玩家重新查询时缓存已存在 → 常用传奇页立刻就有内容；
+     否则先给骨架，等对局数据回来再填（loadMatches 统一分发） */
+  if (SHOW_PICKS) renderPicks(perMatch(matchCache.get(qKey(lastQuery ?? {}))));
+  /* 自动带上对局数据：走势图 / 对局记录 / 常用传奇都靠它，先占位再异步填充，
+     不改变当前页签高亮，也不抢滚动位置 —— 不会拖慢主战绩的显示 */
+  if (NEED_MATCHES()) loadMatches({ auto: true });
+}
+
+/* 排序：直接重排已有节点，比重新渲染省事，也不会重新下载图片 */
+function bindLegendSort() {
+  const grid = $('legendGrid');
+  if (!grid) return;
+  document.querySelectorAll('#legendCard .tbtn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#legendCard .tbtn').forEach((b) => b.classList.toggle('on', b === btn));
+      const byName = btn.dataset.sort === 'name';
+      [...grid.children]
+        .sort((a, b) => {
+          if (!byName) {
+            const d = Number(b.dataset.v) - Number(a.dataset.v);
+            if (d !== 0) return d;
+          }
+          return a.dataset.n.localeCompare(b.dataset.n, 'zh');
+        })
+        .forEach((c) => grid.appendChild(c));
+    });
+  });
+}
+
+/* 前端请求超时：与服务端的硬超时（默认 60s）匹配，略宽一点。
+   目的：ALS/TRN 不通时不要让界面无限转圈 —— 给明确报错，用户才知道该重试。 */
+const FETCH_TIMEOUT_MS = 75_000;
+
+const fetchJson = async (url, body) => {
+  try {
+    return await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch (e) {
+    if (e?.name === 'TimeoutError') {
+      throw new Error(`请求超时（超过 ${Math.round(FETCH_TIMEOUT_MS / 1000)} 秒）。` +
+        '通常是网络不通或上游站被限流，稍后重试即可。');
+    }
+    throw e;
+  }
+};
+
+/* ══════════ 对局数据 ══════════
+   一次抓取同时供「最近表现（走势图）」「对局记录」「常用传奇」使用。
+   数据分两份，**粒度不同，不能混用**：
+     · als —— ALS 的**逐场**明细（击杀/伤害/地图/时长/逐场 RP），但滞后
+     · trn —— TRN 的**会话聚合**（一次连续游戏的合计），但更新
+       ⚠️ 会话的 kills/damage 是「该时段合计」，不是单场；没有地图与时长。
+          所以走势图与「常用传奇」只用 als；只有对局记录会把两者一起列出（分开标注）。
+   结果按查询条件缓存；点「对局记录」页签只是滚过去看，已加载就用缓存。 */
+/* 前端**只展示最近 10 场**（ALS 侧）。
+   后端保留了拉取「全部历史」的能力（CLI：`node track.mjs --matches all`，
+   实测本账号 2484 场 / 6 个赛季），只是目前没有数据库可存，所以不做全量展示。 */
+const MATCH_LIMIT = 10;
+/* 保留：全量拉取的入参值（后端 server.mjs 已支持透传 'all'） */
+const MATCH_LIMIT_ALL = 'all';
+let lastQuery = null;               // 最近一次成功的查询条件
+/* 后端按**当前系统日期**算出的赛季信息（含与 tracker.gg 的一致性校验）。
+   它不属于对局缓存（是查询级的元数据），所以单独存。
+   结构：{ season, name, start, split, trackerSays, consistent, stale, at } */
+let curSeasonInfo = null;
+const matchCache = new Map();        // 查询条件 → { als: [...], trn: [...] }
+const matchInflight = new Set();     // 正在请求中的查询条件（防重复发请求）
+
+const qKey = (q) => `${q.uid || ''}|${q.name || ''}|${q.platform}`;
+
+/* unix 秒 → "09-12 21:30"（本地时区）；拿不到真实时间戳就退回 ALS 的相对文案 */
+function whenText(m) {
+  if (!m?.timestamp) return m?.when ?? '';
+  const d = new Date(m.timestamp * 1000);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/* unix 秒 → "09/12 04:15"（短绝对时间，与相对时间并列显示用） */
+function absShort(ts) {
+  if (!ts) return '';
+  const d = new Date(ts * 1000);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/* 行首的时间标签：相对时间（亮）+ 绝对日期（暗）。
+   两者并列是刻意的 —— 用户问过「当天还是几天前」，单看相对时间不够确定。 */
+function whenLabel(ts, extra) {
+  const rel = relTime(ts);
+  const abs = absShort(ts);
+  const full = ts ? new Date(ts * 1000).toLocaleString('zh-CN') : '';
+  if (!rel && !abs) return '';
+  return `<div class="when"${full ? ` title="${esc(full)}"` : ''}>${
+    rel ? `<b>${esc(rel)}</b>` : ''}${
+    abs ? `<span>${esc(abs)}</span>` : ''}${
+    extra ? `<span>${esc(extra)}</span>` : ''}</div>`;
+}
+
+/* unix 秒 → 相对时间（"2 天前"），对齐 tracker.gg 的 "2 days ago"。
+   ⚠️ 数据里**没有**这个字段（tracker.gg 也是前端算的），必须自己算。
+   它是相对**当前时刻**动态计算的：同一份缓存数据放久了，就会从「2 天前」变成「2 周前」，
+   这是正确行为（数据确实旧了）。绝对时间放 title 里备查。
+
+   日级用**日历天**而不是 24 小时差值 —— 「今天/昨天」是用户真正的心理模型，
+   按 24h 差会出现「23 小时前」其实是昨天、或「25 小时前」其实只隔了一晚的困惑。 */
+function relTime(ts) {
+  if (!ts) return '';
+  const now = Date.now();
+  const diff = Math.floor(now / 1000) - ts;
+  // 未来时间（客户端时钟偏差 / 服务端时间不准）统一显示「刚刚」，避免「−1 天前」
+  if (diff < 60) return '刚刚';
+  if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
+
+  const d = new Date(ts * 1000);
+  const today = new Date(now);
+  const dayOf = (x) => Math.floor(new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime() / 86400000);
+  const dayDiff = dayOf(today) - dayOf(d);
+
+  if (dayDiff <= 0) return `${Math.floor(diff / 3600)} 小时前`; // 同一天
+  if (dayDiff === 1) return '昨天';
+  if (dayDiff < 7) return `${dayDiff} 天前`;
+  if (dayDiff < 30) return `${Math.floor(dayDiff / 7)} 周前`;
+  if (dayDiff < 365) return `${Math.floor(dayDiff / 30)} 个月前`;
+  return `${Math.floor(dayDiff / 365)} 年前`;
+}
+
+/* 赛季 "s29_s2" → "S29 · 第 2 段" */
+function splitLabel(s) {
+  const m = /^s(\d+)_s(\d+)$/.exec(String(s ?? ''));
+  return m ? `S${m[1]} · 第 ${m[2]} 段` : String(s ?? '—');
+}
+
+/* 对局的 stats 是任意键值对，优先取「击杀 / 伤害」，取不到再退回前两项。
+   注意必须精确匹配 Kills —— 否则 "Career Kills" 会被当成本场击杀 */
+function matchStats(s) {
+  const o = s ?? {};
+  const keys = Object.keys(o);
+  const pick = (exact, re) => keys.find((k) => k === exact) ?? keys.find((k) => re.test(k));
+  const out = [];
+  const kk = pick('Kills', /^Kills$/i), kd = pick('Damage', /Damage/i);
+  if (kk) out.push(['击杀', o[kk]]);
+  if (kd) out.push(['伤害', o[kd]]);
+  if (!out.length) keys.slice(0, 2).forEach((k) => out.push([k, o[k]]));
+  return out;
+}
+
+/* 统计键 → 中文标签。
+   **只翻译含义明确的通用项**；传奇专属追踪器（如 "Tempest: Damage"、"Bamboozles"）
+   是游戏内的技能/道具名，没有统一权威译名，硬译容易错，所以**保留英文原文**。 */
+const STAT_CN = {
+  Kills: '击杀',
+  Damage: '伤害',
+  Revives: '复活',
+  Headshots: '爆头',
+  Wins: '胜场',
+  'Career Kills': '生涯击杀',
+};
+const statCN = (k) => STAT_CN[k] ?? k;
+
+/* 对局行第二行：把该场**所有可用数据平铺**出来。
+   第一行只留头条数字（击杀 / 伤害）；这里放等级、XP、其余追踪器数值，
+   末尾再列出**该场记录到的追踪器组合原文**（= stats 的键），
+   这样「为什么第一行是击杀/伤害」一眼能对上，也方便和游戏内对照。 */
+function matchExtra(m) {
+  const s = m.stats ?? {};
+  const keys = Object.keys(s);
+  const items = [];
+  if (m.level != null) items.push(['等级', fmt(m.level)]);
+  if (m.xp != null) items.push(['XP', fmt(m.xp)]);
+  for (const k of keys) {
+    if (k === 'Kills' || k === 'Damage') continue; // 第一行已有，不重复列值
+    const v = s[k];
+    if (v == null || v === '') continue;
+    items.push([statCN(k), String(v)]);
+  }
+
+  const chip = ([k, v]) =>
+    `<span class="ex"><span class="k" title="${esc(k)}">${esc(k)}</span><b>${esc(v)}</b></span>`;
+
+  const combo = keys.length
+    ? `<span class="trk"><span class="lh">追踪器</span>` +
+      `<span class="cn">${keys.map(esc).join(' · ')}</span></span>`
+    : '';
+
+  return `<div class="extra">${items.map(chip).join('')}${combo}</div>`;
+}
+
+const matchHead = (sub) => `<h2><span class="ico"></span><span class="code">Matches</span>对局记录<span class="sub">${esc(sub)}</span></h2>`;
+
+/* ══════════ 最近表现：RP 走势 ══════════ */
+
+const trendHead = (sub) => `<h2><span class="ico"></span><span class="code">Trend</span>最近表现<span class="sub">${esc(sub)}</span></h2>`;
+
+/* 走势图的赛季选择：
+   · trendSeason        —— 当前选中（null = 全部），默认由 renderTrend 设为最新赛季
+   · trendSeasonTouched —— 用户是否手动点过；没点过则跟着最新赛季走
+     （换玩家/重新查询后不会把用户的选择弄丢，也不会停在已不存在的赛季） */
+let trendSeason = null;
+let trendSeasonTouched = false;
+
+/* 只保留有真实 RP + 时间戳的场次，并按时间正序（旧 → 新）。
+   对局列表本身是「新 → 旧」，直接画会把走势整个画反。
+   RP 是「这一场打完之后」的分数，所以正序排列后天然就是段位走势。
+   带上 season 用作图上分段（赛季由后端按时间戳推导）。 */
+function trendPoints(list) {
+  return list
+    .filter((m) => m.rp != null && m.timestamp != null)
+    .map((m) => ({ rp: m.rp, ts: m.timestamp, season: m.season ?? null, name: m.seasonName ?? null }))
+    .sort((a, b) => a.ts - b.ts);
+}
+
+const shortDay = (ts) => {
+  const d = new Date(ts * 1000);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getMonth() + 1)}/${p(d.getDate())}`;
+};
+
+/* Y 轴刻度用 k 缩写（12,390 → 12.4k）：viewBox 单位里 padL 只有 60，
+   字号放大后六位数字会顶出左边界被 SVG 裁掉 */
+const shortRp = (v) => (v >= 10000 ? `${(v / 1000).toFixed(1).replace(/\.0$/, '')}k` : fmt(v));
+
+/* 手写 SVG 折线图（项目约定：零外部依赖，不引任何图表库）。
+   注意 SVG 会按 viewBox 等比缩放，所以字号/线宽在窄屏要 media query 补大。
+   opts.segments=false 时不画赛季分界线（只看单赛季时它们是多余的）。 */
+function trendSvg(pts, opts = {}) {
+  const drawSeg = opts.segments !== false;
+  const W = 760, H = 200;
+  const padL = 60, padR = 14, padT = 16, padB = 28;
+  const iw = W - padL - padR, ih = H - padT - padB;
+  const n = pts.length;
+
+  const vals = pts.map((p) => p.rp);
+  const vLo = Math.min(...vals), vHi = Math.max(...vals);
+  /* 值域往往很窄（一晚上就 ±500），从 min 起画会贴着边框 —— 留 16% 呼吸空间 */
+  const span = Math.max(vHi - vLo, 100);
+  const yLo = vLo - span * 0.16, yHi = vHi + span * 0.16;
+
+  const X = (i) => padL + (n === 1 ? iw / 2 : (i / (n - 1)) * iw);
+  const Y = (v) => padT + (1 - (v - yLo) / (yHi - yLo)) * ih;
+  const yBot = padT + ih;
+
+  /* 颜色跟着整段走势的涨跌走：涨 = 青绿收尾蓝，跌 = 红 */
+  const net = vals.at(-1) - vals[0];
+  const up = net >= 0;
+  /* 涨 = 琥珀→钢青，跌 = 琥珀→余烬（和全站三个功能色保持一致） */
+  const cIn = up ? '#5ed0d8' : '#ff5a37';
+  const cOut = '#ff9f28';
+
+  const line = pts.map((p, i) => `${X(i).toFixed(1)},${Y(p.rp).toFixed(1)}`).join(' ');
+  const area = `${X(0).toFixed(1)},${yBot.toFixed(1)} ${line} ${X(n - 1).toFixed(1)},${yBot.toFixed(1)}`;
+  /* 网格标签用真实值（不是加了 padding 的边界），读出来才是实际 RP */
+  const ticks = [vHi, (vHi + vLo) / 2, vLo];
+  /* 高亮点只画首尾和区间极值，其余靠透明热区给原生 tooltip，避免一片密密麻麻 */
+  const marks = new Set([0, n - 1, vals.indexOf(vHi), vals.indexOf(vLo)]);
+
+  /* ── 赛季分段 ──
+     找出赛季切换的位置（相邻两点的 season 不同），在中间画一条竖虚线 + 顶部标签。
+     这样一眼能看出「哪段是哪个赛季」，而不是一条看不出归属的曲线。 */
+  const bounds = [];
+  if (drawSeg) {
+    for (let i = 1; i < n; i++) {
+      if (pts[i].season != null && pts[i - 1].season != null && pts[i].season !== pts[i - 1].season) {
+        bounds.push(i);
+      }
+    }
+  }
+  /* 每个赛季的区段（用于顶部标签的居中定位） */
+  const segs = [];
+  let from = 0;
+  for (const b of [...bounds, n]) {
+    segs.push({ from, to: b - 1, season: pts[from].season, name: pts[from].name });
+    from = b;
+  }
+  /* 区段标签：只有**真的跨赛季**（≥2 段）才标。
+     单赛季时标题里已有赛季名，图里再标一次是重复信息。 */
+  const useSegLabels = drawSeg && bounds.length > 0;
+  const segDividers = bounds.map((i) => {
+    // 分界线取两侧点的中点，落在两场之间更自然
+    const x = (X(i - 1) + X(i)) / 2;
+    return `<line class="seg" x1="${x.toFixed(1)}" y1="${padT - 4}" x2="${x.toFixed(1)}" y2="${yBot}"/>`;
+  }).join('');
+  /* 顶部赛季标签：只在跨赛季时标，且区段要够宽，否则会叠在一起 */
+  const segLabels = !useSegLabels ? '' : segs.map((s) => {
+    const x0 = X(s.from), x1 = X(s.to);
+    if (x1 - x0 < 44 || s.season == null) return '';
+    const cx = (x0 + x1) / 2;
+    return `<text class="seg-lab" x="${cx.toFixed(1)}" y="${padT - 10}" text-anchor="middle">S${s.season}</text>`;
+  }).join('');
+
+  return `<svg class="trend" viewBox="0 0 ${W} ${H}" role="img"
+      aria-label="最近 ${n} 场 RP 走势，区间 ${fmt(vLo)} 至 ${fmt(vHi)}">
+    <defs>
+      <linearGradient id="tLine" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="${cOut}"/><stop offset="1" stop-color="${cIn}"/>
+      </linearGradient>
+      <linearGradient id="tFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${cIn}" stop-opacity=".20"/>
+        <stop offset="1" stop-color="${cIn}" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    ${ticks.map((v) => `<line class="grid" x1="${padL}" y1="${Y(v).toFixed(1)}"
+        x2="${W - padR}" y2="${Y(v).toFixed(1)}"/>`).join('')}
+    ${ticks.map((v) => `<text class="axis y-lab" x="${padL - 9}" y="${(Y(v) + 4).toFixed(1)}"
+        text-anchor="end">${shortRp(v)}</text>`).join('')}
+    ${segDividers}
+    ${segLabels}
+    <polygon points="${area}" fill="url(#tFill)"/>
+    <polyline class="line" points="${line}" stroke="url(#tLine)"/>
+    ${pts.map((p, i) => (marks.has(i)
+      ? `<circle class="dot" cx="${X(i).toFixed(1)}" cy="${Y(p.rp).toFixed(1)}" r="3.4" fill="${cIn}"/>`
+      : '')).join('')}
+    ${pts.map((p, i) => `<circle class="hit" cx="${X(i).toFixed(1)}" cy="${Y(p.rp).toFixed(1)}" r="10">
+        <title>${esc(`${shortDay(p.ts)} · ${fmt(p.rp)} RP${p.season ? ` · S${p.season}` : ''}`)}</title></circle>`).join('')}
+    <text class="axis axis-x" x="${padL}" y="${H - 8}" text-anchor="start">${shortDay(pts[0].ts)}</text>
+    <text class="axis axis-x" x="${W - padR}" y="${H - 8}" text-anchor="end">${shortDay(pts.at(-1).ts)}</text>
+  </svg>`;
+}
+
+const fmtSigned = (v) => (v > 0 ? `+${fmt(v)}` : fmt(v));
+const trendCls = (v) => (v > 0 ? 'up' : v < 0 ? 'dn' : '');
+
+function trendFoot(list) {
+  const chg = list.map((m) => m.rpChange).filter((v) => v != null);
+  const net = chg.reduce((a, b) => a + b, 0);
+  const avg = chg.length ? Math.round(net / chg.length) : 0;
+  const cell = (k, v, c = '') => `<div><div class="k">${k}</div><div class="v ${c}">${v}</div></div>`;
+  return `<div class="trend-foot">
+    ${cell('净 RP', fmtSigned(net), trendCls(net))}
+    ${cell('场均', fmtSigned(avg), trendCls(avg))}
+    ${cell('最好一场', chg.length ? fmtSigned(Math.max(...chg)) : '—', trendCls(Math.max(...chg)))}
+    ${cell('最差一场', chg.length ? fmtSigned(Math.min(...chg)) : '—', trendCls(Math.min(...chg)))}
+  </div>`;
+}
+
+/* 按赛季拆分的统计。
+   ⚠️ 净 RP 必须用 **`rpChange` 累加**，不能用「曲线首尾差值」——
+   首尾差值会被脏数据与时间断档影响（实测两者能差好几千），
+   而且要和「对局记录」页的赛季分组口径保持一致。 */
+function trendSeasonStats(list) {
+  const by = new Map();
+  for (const m of list) {
+    if (m.season == null) continue;
+    let g = by.get(m.season);
+    if (!g) {
+      by.set(m.season, (g = { season: m.season, name: m.seasonName ?? null, pts: 0, net: 0 }));
+    }
+    g.pts++;
+    g.net += m.rpChange ?? 0;
+  }
+  return [...by.values()].sort((a, b) => a.season - b.season);
+}
+
+function renderTrend(list) {
+  if (!SHOW_TREND) return;
+  const card = $('trendCard');
+  if (!card) return;
+
+  /* 赛季拆分用**全量 list**（不限于有 RP 的 pts），与对局记录口径一致 */
+  const ss = trendSeasonStats(list);
+  const allSeasons = ss.map((s) => s.season).sort((a, b) => b - a); // 新 → 旧
+  const latest = allSeasons[0] ?? null;
+
+  /* ⚠️ **默认只看最新赛季**：跨 5 个赛季画一条曲线，值域从 3.5k 拉到 12.7k，
+     每个赛季的起伏会被压成一条平线，看不出节奏 —— 这也是用户要求「选赛季」的原因。
+     两个变量分工：
+       · `trendSeason` —— 当前选中的赛季（null = 全部）
+       · `trendSeasonTouched` —— 用户是否手动点过，没点过时跟随最新赛季 */
+  if (!trendSeasonTouched && trendSeason !== latest) trendSeason = latest;
+
+  const listForTrend = trendSeason == null ? list : list.filter((m) => m.season === trendSeason);
+  const pts = trendPoints(listForTrend);
+  const activeName = ss.find((s) => s.season === trendSeason)?.name ?? null;
+
+  /* 赛季选择按钮（只在有多个赛季时出现） */
+  const picker = allSeasons.length > 1 ? `<div class="trend-picker">
+    <span class="lb">赛季</span>
+    <button class="tbtn${trendSeason == null ? ' on' : ''}" data-tseason="all">全部</button>
+    ${allSeasons.map((s) => `<button class="tbtn${trendSeason === s ? ' on' : ''}"
+      data-tseason="${s}" title="只看 S${s}">S${s}</button>`).join('')}
+    <span class="hint">默认最新赛季</span>
+  </div>` : '';
+
+  const sub = pts.length
+    ? (trendSeason == null
+        ? `全部 ${ss.length} 个赛季 · ${pts.length} 场`
+        : `S${trendSeason}${activeName ? ` · ${activeName}` : ''} · ${pts.length} 场`)
+    : '—';
+
+  if (pts.length < 2) {
+    card.innerHTML = `${trendHead(sub)}${picker}
+      <div class="note">${trendSeason == null ? '这段时间' : `S${trendSeason}`}的对局里
+        没有足够的 RP 记录（需 ≥2 场），画不出走势。${
+        allSeasons.length > 1 ? '<br>试试切到别的赛季，或点「全部」。' : ''}</div>`;
+    bindTrendPicker();
+    return;
+  }
+
+  /* 只有看「全部」且真的跨赛季时才需要图例与分段线；单赛季下它们是多余的 */
+  const showSeg = trendSeason == null && ss.length > 1;
+  const legend = showSeg
+    ? `<div class="trend-legend">${ss.map((s) => `<span class="lgd">
+        <b>S${s.season}</b>${s.name ? ` ${esc(s.name)}` : ''}
+        <i>${s.pts} 场</i>
+        <em class="${trendCls(s.net)}">${fmtSigned(s.net)}</em>
+      </span>`).join('')}</div>`
+    : '';
+
+  card.innerHTML = `${trendHead(sub)}${picker}${trendSvg(pts, { segments: showSeg })}${legend}${trendFoot(listForTrend)}`;
+  bindTrendPicker();
+}
+
+/* 赛季按钮：只重渲染走势图，不重新请求 */
+function bindTrendPicker() {
+  document.querySelectorAll('#trendCard .trend-picker [data-tseason]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const v = btn.dataset.tseason;
+      trendSeason = v === 'all' ? null : Number(v);
+      trendSeasonTouched = true;
+      const pack = matchCache.get(qKey(lastQuery ?? {}));
+      if (pack) renderTrend(perMatch(pack));
+    });
+  });
+}
+
+/* ══════════ 常用传奇（独立页面） ══════════
+   完全复用「对局数据」那一份缓存，不额外发任何请求。
+   它不在第一页出现 —— 挂在 #pagePicks 里，点「常用传奇」页签才显示。 */
+
+const picksHead = (sub) => `<h2><span class="ico"></span><span class="code">Picks</span>常用传奇<span class="sub">${esc(sub)}</span></h2>`;
+
+/** 切页：Overview / 常用传奇 / 数据对比 三个独立页面 */
+function showPage(name) {
+  const ov = $('pageOverview'), pk = $('pagePicks'), cp = $('pageCompare');
+  if (ov) ov.hidden = name !== 'overview';
+  if (pk) pk.hidden = name !== 'picks';
+  if (cp) cp.hidden = name !== 'compare';
+}
+
+/* ══════════ 数据对比（ALS vs TRN，独立页面） ══════════
+   目的：两个源各有短长，且**对局历史的新旧差别很大**（实测 ALS 比 TRN 旧约 2 个月）。
+   这里把可核对的事实摆出来 —— 新鲜度、交叉验证、能力矩阵 —— 再给结论。
+   走 `provider: 'both'`：ALS 聚合 + TRN 会话 + 服务端算好的 compare 对象。
+   TRN 限流 10 次/分钟，所以只在本页签被点开时才请求。 */
+
+const COMPARE_HEAD = (sub) => `<h2><span class="ico"></span><span class="code">Compare</span>数据对比<span class="sub">${esc(sub)}</span></h2>`;
+
+/* 数据来源的中文说明 */
+const TRN_SRC = { page: '网页直抓', api: '官方 API', browser: '浏览器采集' };
+
+/* 给用户自己用的采集脚本：
+   在 tracker.gg 的 matches 页按 F12 打开控制台粘贴运行。
+   为什么必须在浏览器里跑：tracker.gg 由 Cloudflare 防护，
+   服务端请求一律 403（实测挑战页），只有过了挑战的真实浏览器能拿到数据。
+
+   **同时采集两份数据**（都在页面的 __INITIAL_STATE__ 里）：
+     · standardSessions[0].items —— 对局会话（对局记录用）
+     · standardProfiles[0]       —— 账号聚合 + 传奇分段（等级/RP/段位/传奇用）
+   有了 profiles，本项目的全部数据来源都只需 tracker.gg，不再依赖 ALS。 */
+function collectSnippet() {
+  const origin = location.origin || 'http://127.0.0.1:8787';
+  return `(async()=>{const S=window.__INITIAL_STATE__?.stats;
+const items=S?.standardSessions?.[0]?.items, profile=S?.standardProfiles?.[0];
+if(!items?.length)return console.error('本页未找到对局数据，请确认已打开 /matches 页面');
+const p=location.pathname.split('/');
+const r=await fetch('${origin}/api/ingest/trn',{method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({player:p[4],platform:p[3],sourceUrl:location.href,
+    data:{items,profile}})});
+console.log('已发送',items.length,'个会话'+(profile?' + 账号档案':'（无 profile）'),'→',await r.json());})()`;
+}
+
+/* unix 秒 → "07-19 03:21" */
+function tsText(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts * 1000);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+const cell = (v, unit = '') => (v == null ? '<span class="na">—</span>' : `${fmt(v)}${unit}`);
+
+function renderCompare(cmp) {
+  if (!SHOW_COMPARE) return;
+  const card = $('compareCard');
+  if (!card) return;
+
+  if (!cmp) {
+    card.innerHTML = `${COMPARE_HEAD('—')}
+      <div class="note" style="text-align:left;padding:2px 0 14px">没有拿到对比数据。</div>`;
+    return;
+  }
+
+  const f = cmp.freshness ?? {};
+  const v = cmp.verdict ?? {};
+  const hasTrn = f.trn != null;
+
+  /* 新鲜度：两个源并排，直观看出差多少 */
+  const fresh = `<div class="fresh">
+    <div class="fbox">
+      <div class="fk"><span class="src als">ALS</span>最新一场</div>
+      <div class="fd">${esc(tsText(f.als))}</div>
+      <div class="fl">英雄 <b>${esc(legendCN(f.alsNewestLegend) ?? '—')}</b></div>
+    </div>
+    <div class="fbox trn">
+      <div class="fk"><span class="src trn">TRN</span>最新会话${cmp.trnSource ? ` · ${esc(TRN_SRC[cmp.trnSource] ?? cmp.trnSource)}` : ''}</div>
+      <div class="fd">${esc(tsText(f.trn))}</div>
+      <div class="fl">英雄 <b>${esc(legendCN(f.trnNewestLegend) ?? '—')}</b>
+        ${cmp.trnCollectedAt ? `<br>采集于 ${esc(tsText(Date.parse(cmp.trnCollectedAt) / 1000))}` : ''}</div>
+    </div>
+  </div>
+  ${f.gapDays != null && f.gapDays > 0
+    ? `<div class="gap-note">两源相差约 ${f.gapDays} 天 —— 这就是「本地显示一个英雄、tracker.gg 显示另一个」的原因</div>`
+    : ''}`;
+
+  /* 交叉验证：口径对齐后逐项比对 */
+  const ccRows = (cmp.crossCheck ?? []).map((c) => `<tr>
+    <td>${esc(c.field)}${c.note ? `<div class="note">${esc(c.note)}</div>` : ''}</td>
+    <td class="num">${cell(c.als, c.unit === 'RP' ? ' RP' : '')}</td>
+    <td class="num">${cell(c.trn, c.unit === 'RP' ? ' RP' : '')}</td>
+    <td>${c.als == null || c.trn == null ? '<span class="na">缺数据</span>'
+      : c.same ? '<span class="same">一致 ✓</span>' : '<span class="diff">不一致 ✗</span>'}</td>
+  </tr>`).join('');
+
+  /* 能力矩阵：说明为什么不能简单合并两个源 */
+  const capRows = (cmp.capabilities ?? []).map((c) => `<tr>
+    <td>${esc(c.item)}</td>
+    <td>${c.als ? '<span class="yes">有</span>' : '<span class="no">无</span>'}</td>
+    <td>${c.trn ? '<span class="yes">有</span>' : '<span class="no">无</span>'}</td>
+    <td></td>
+  </tr>`).join('');
+
+  const cov = cmp.coverage ?? {};
+  card.innerHTML = `${COMPARE_HEAD('ALS vs TRN')}
+    <div class="verdict ${esc(v.level ?? '')}">${esc(v.text ?? '')}</div>
+    ${cmp.trnError ? `<div class="note" style="text-align:left;padding:0 0 16px">
+      TRN 数据获取失败：<code>${esc(cmp.trnError)}</code><br>
+      数据来自抓取 <code>apex.tracker.gg</code> 页面（页面已把数据嵌在 HTML 里，<b>不需要 API Key</b>）。
+      若失败通常是网络不通或被 Cloudflare 拦了验证页，稍后重试即可。
+      （可选：配了 <code>TRN_API_KEY</code> 就会改用官方 API，作为备选。）</div>` : ''}
+    ${fresh}
+    <h3 class="sub-h">交叉验证</h3>
+    <table class="ctab">
+      <thead><tr><th>字段</th><th>ALS</th><th>TRN</th><th>结论</th></tr></thead>
+      <tbody>${ccRows || '<tr><td colspan="4" class="na">无可比字段</td></tr>'}</tbody>
+    </table>
+    <h3 class="sub-h">数据能力对比</h3>
+    <table class="ctab">
+      <thead><tr><th>能力</th><th>ALS</th><th>TRN</th><th></th></tr></thead>
+      <tbody>${capRows}</tbody>
+    </table>
+    <h3 class="sub-h">覆盖度</h3>
+    <div class="pick-sum">
+      <div><div class="k">ALS 对局数</div><div class="v">${cov.alsMatchCount ?? 0}<small>逐场</small></div></div>
+      <div><div class="k">TRN 会话数</div><div class="v">${cov.trnSessionCount ?? 0}<small>会话</small></div></div>
+      <div><div class="k">ALS 粒度</div><div class="v">逐场</div></div>
+      <div><div class="k">TRN 粒度</div><div class="v">会话聚合</div></div>
+    </div>
+    <div class="note" style="text-align:left;padding:14px 0 0">
+      说明：TRN 数据直接<b>抓网页</b>获得（tracker.gg 是 Vue 服务端渲染，
+      首屏数据以 <code>window.__INITIAL_STATE__</code> 嵌在 HTML 里），
+      <b>无需 API Key</b>；站点限额 20 次/分钟，已内置限速，一次查询只发 1 个请求。<br>
+      但它的 <code>/sessions</code> 只提供<b>会话级聚合</b>（一次连续游戏的合计），
+      <code>duration</code> 恒为默认值不可信用，也没有地图与逐场 RP 变化。
+      所以「混合」的做法是：
+      <b>聚合数据与逐场明细用 ALS，更新近的对局用 TRN 补</b>，而不是用 TRN 取代 ALS。
+      ${!hasTrn ? '<br>当前未取到 TRN 数据，上述 TRN 列为空。' : ''}
+    </div>
+    <h3 class="sub-h">怎么更新 TRN 数据（无需 Key）</h3>
+    <div class="note" style="text-align:left;padding:0 0 10px">
+      tracker.gg 有 Cloudflare 防护，<b>服务端直接抓会被 403 拦下</b>（实测挑战页），
+      所以改用你的浏览器采集 —— 浏览器能过挑战，把页面里已渲染好的数据发回本地服务：
+      <ol style="margin:8px 0 0;padding-left:20px">
+        <li>新开一个标签页，访问 <code>apex.tracker.gg/apex/profile/origin/&lt;你的ID&gt;/matches</code></li>
+        <li>按 <b>F12</b> 打开控制台，把下面这段粘进去回车</li>
+        <li>回到本页刷新（或重开「数据对比」页签）就能看到数据</li>
+      </ol>
+    </div>
+    <div class="snippet">
+      <pre id="collectCode">${esc(collectSnippet())}</pre>
+      <button class="tbtn" id="copySnippet">复制</button>
+    </div>
+    <div class="note" style="text-align:left;padding:10px 0 0">
+      站点限额 <b>20 次/分钟</b>，每次采集只发 1 个请求，远低于限额。
+      数据落盘在 <code>data/trn-sessions.json</code>。
+      （可选：配了 <code>TRN_API_KEY</code> 会自动改用官方 API，作为备选；不配也完全可用。）
+    </div>`;
+
+  const btn = $('copySnippet');
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(collectSnippet());
+        btn.textContent = '已复制 ✓';
+        setTimeout(() => (btn.textContent = '复制'), 1600);
+      } catch {
+        btn.textContent = '请手动选中复制';
+      }
+    });
+  }
+}
+
+let compareInflight = false;
+async function loadCompare() {
+  if (!SHOW_COMPARE) return;
+  if (compareInflight) return;
+  const card = $('compareCard');
+  if (card && !card.dataset.done) {
+    card.innerHTML = `${COMPARE_HEAD('加载中…')}
+      <div class="note" style="text-align:left;padding:2px 0 14px">
+        <span class="spin"></span>正在同时取 ALS 与 TRN 数据并交叉核对…</div>
+      ${Array.from({ length: 3 }, () => '<div class="sk" style="height:56px;margin-bottom:10px"></div>').join('')}`;
+  }
+  compareInflight = true;
+  try {
+    const q = lastQuery ?? { name: $('name').value.trim(), platform: $('platform').value };
+    const res = await fetch('/api/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // 只取少量对局 —— 对比页关心的是「最新一场」，不需要拉很多
+      body: JSON.stringify({ ...q, matches: 10, provider: 'both' }),
+    });
+    const j = await res.json().catch(() => null);
+    if (!res.ok || !j?.ok) throw new Error(j?.error || `本地服务返回 HTTP ${res.status}`);
+    renderCompare(j.compare);
+    if (card) card.dataset.done = '1';
+  } catch (e) {
+    if (card) {
+      card.innerHTML = `${COMPARE_HEAD('加载失败')}
+        <pre class="errbox" style="margin:0">${esc(e.message || String(e))}</pre>`;
+    }
+  } finally {
+    compareInflight = false;
+  }
+}
+
+/** 把对局列表按传奇聚合：出场数 / 净 RP / 击杀 / 伤害 / 胜场 */
+function pickStats(list) {
+  const by = new Map();
+  for (const m of list ?? []) {
+    if (!m?.legend) continue;
+    let r = by.get(m.legend);
+    if (!r) by.set(m.legend, (r = { legend: m.legend, games: 0, net: 0, kills: 0, dmg: 0, wins: 0 }));
+    r.games++;
+    r.net += m.rpChange ?? 0;
+    if (toNum(m.stats?.Wins) > 0) r.wins++;
+    // 必须精确匹配 Kills —— 否则 "Career Kills" 会被算进本场击杀
+    for (const [k, v] of Object.entries(m.stats ?? {})) {
+      if (k === 'Kills') r.kills += toNum(v);
+      else if (/damage/i.test(k)) r.dmg += toNum(v);
+    }
+  }
+  // 出场多的排前面；并列时看净 RP，再并列看名称（保证顺序稳定）
+  return [...by.values()].sort((a, b) =>
+    b.games - a.games || b.net - a.net || legendCN(a.legend).localeCompare(legendCN(b.legend), 'zh'));
+}
+
+function renderPicks(list) {
+  if (!SHOW_PICKS) return;
+  const card = $('picksCard');
+  if (!card) return;
+
+  // list === null 表示对局数据还没回来（缓存里没有）
+  if (list == null) {
+    card.innerHTML = `${picksHead('加载中…')}
+      <div class="note" style="text-align:left;padding:2px 0 14px">
+        <span class="spin"></span>正在等对局数据…</div>
+      ${Array.from({ length: 4 }, () => '<div class="sk" style="height:54px;margin-bottom:10px"></div>').join('')}`;
+    return;
+  }
+
+  const rows = pickStats(list);
+  if (!rows.length) {
+    card.innerHTML = `${picksHead('—')}<div class="note">这段时间的对局里没有可统计的传奇数据。</div>`;
+    return;
+  }
+
+  const total = rows.reduce((s, r) => s + r.games, 0);
+  const max = rows[0].games;
+  const top = rows[0];
+
+  const body = rows.map((r, i) => {
+    const share = Math.round((r.games / total) * 100);
+    const meta = [
+      r.kills ? `击杀 ${fmt(r.kills)}` : '',
+      r.dmg ? `伤害 ${fmt(r.dmg)}` : '',
+      r.wins ? `胜 ${r.wins}` : '',
+    ].filter(Boolean).join(' · ');
+    const avg = Math.round(r.net / r.games);
+    const img = legendImg(r.legend);
+    return `<div class="pick-row${i === 0 ? ' is-main' : ''}">
+      <div class="av-wrap">
+        <div class="av-f">${legendInitial(r.legend)}</div>
+        ${img ? `<img class="av" src="${img}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+      </div>
+      <div>
+        <div class="nm"><span class="i">${i + 1}.</span><span class="t" title="${esc(r.legend)}">${esc(legendCN(r.legend))}</span>${i === 0 ? '<span class="badge-main">主力</span>' : ''}</div>
+        <div class="meter" style="max-width:260px"><i style="width:${Math.max(4, Math.round((r.games / max) * 100))}%"></i></div>
+        <div class="mt">${esc(meta) || '—'}</div>
+      </div>
+      <div class="ct">
+        <div class="v">${r.games}</div>
+        <div class="k">${share}% 出场</div>
+      </div>
+      <div class="rp">
+        <div class="v ${trendCls(r.net)}">${fmtSigned(r.net)}</div>
+        <div class="k">场均 ${fmtSigned(avg)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  card.innerHTML = `${picksHead(`${total} 个会话 · ${rows.length} 个传奇`)}
+    <div class="pick-sum">
+      <div><div class="k">总场次</div><div class="v">${total}</div></div>
+      <div><div class="k">使用过的传奇</div><div class="v">${rows.length}</div></div>
+      <div><div class="k">主力传奇</div><div class="v" title="${esc(top.legend)}">${esc(legendCN(top.legend))} <small>${Math.round((top.games / total) * 100)}%</small></div></div>
+    </div>
+    ${body}`;
+}
+
+/* 卡片是异步填充的，渲染时按需插入到 #result 末尾 */
+function ensureMatchCard() {
+  let el = $('matchCard');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'card';
+    el.id = 'matchCard';
+    // 挂在第一页里（#pageOverview），不要落到 #result 上
+    ($('pageOverview') ?? $('result')).appendChild(el);
+  }
+  return el;
+}
+
+/* ── 排位 / 匹配 ──
+   后端（track.mjs）已算好 `playlist`：
+     ALS 逐场：`ranked`（有 RP） / `pubs`（无 RP）—— **确定**，因为 Apex 只有排位才给 RP
+     TRN 会话：`ranked`（RP 变动非 0） / `unknown`（RP 变动为 0，无法区分「匹配」与「净 0 的排位」）
+   ⚠️ 不要把 `unknown` 说成「匹配」—— 那是统计推断（35/87），不是确定结论。 */
+const PLAYLIST = {
+  ranked: { label: '排位', cls: 'ranked' },
+  pubs: { label: '匹配', cls: 'pubs' },
+  unknown: { label: '未定', cls: 'unknown', title: 'RP 未变动，无法区分「匹配」与「净变化为 0 的排位」' },
+};
+
+/** 行内的排位/匹配徽标 */
+function playlistBadge(p) {
+  const def = PLAYLIST[p];
+  if (!def) return '';
+  return `<span class="badge-pl ${def.cls}"${def.title ? ` title="${esc(def.title)}"` : ''}>${def.label}</span>`;
+}
+
+/** 当前筛选：'all' | 'ranked' | 'pubs'（'pubs' 含未定） */
+let matchFilter = 'all';
+/* 赛季筛选：null = 全部；否则只看该赛季号。
+   与走势图的 trendSeason 同构：
+   · seasonFilter        —— 当前选中
+   · seasonFilterTouched —— 用户是否手动点过；没点过则跟跟最新赛季 */
+let seasonFilter = null;
+let seasonFilterTouched = false;
+
+/** 一条记录是否属于当前筛选 */
+function passFilter(p) {
+  if (matchFilter === 'all') return true;
+  if (matchFilter === 'ranked') return p === 'ranked';
+  // 「匹配」视图把未定也包含进来（否则那些行会两个视图都看不到）
+  return p === 'pubs' || p === 'unknown' || p == null;
+}
+
+/** 是否属于当前赛季筛选 */
+const passSeason = (m) => seasonFilter == null || m.season === seasonFilter;
+
+function matchRow(m) {
+  const img = legendImg(m.legend);
+  const rk = rankImg(m.rank);
+  const chg = m.rpChange;
+  const cls = chg == null ? 'na' : chg > 0 ? 'up' : 'dn';
+  const chgTxt = chg == null ? '—' : chg > 0 ? `+${chg}` : String(chg);
+  const win = Number(m.stats?.Wins ?? 0) > 0;
+  /* 时间放最上面（与 TRN 行一致）；下面一行放模式/地图/时长 */
+  const when = whenLabel(m.timestamp) || (m.when ? `<div class="when"><b>${esc(m.when)}</b></div>` : '');
+  const meta = [m.mode, m.map, m.duration].filter(Boolean).map(esc).join(' · ');
+  const pairs = matchStats(m.stats);
+  // 没有追踪数据的场次给一个占位符，否则中间列会完全空白、网格看着断裂
+  const ks = pairs.length
+    ? pairs.map(([k, v]) => `<span><span class="k">${esc(k)}</span><b>${esc(v)}</b></span>`).join('')
+    : '<span><span class="k">追踪数据</span><b>—</b></span>';
+  return `<div class="mrow${m.playlist === 'ranked' ? ' is-ranked' : ''}">
+    <div class="av-wrap">
+      <div class="av-f">${legendInitial(m.legend)}</div>
+      ${img ? `<img class="av" src="${img}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+    </div>
+    <div>
+      ${when}
+      <div class="nm" title="${esc(m.legend ?? '')}">${esc(legendCN(m.legend) ?? '—')}${playlistBadge(m.playlist)}${win ? '<span class="badge-win">胜</span>' : ''}</div>
+      <div class="meta">${meta || '—'}</div>
+    </div>
+    <div class="ks${pairs.length ? '' : ' na'}">${ks}</div>
+    <div class="rp">
+      <div class="chg ${cls}">${chgTxt}</div>
+      <div class="rpv">${rk ? `<img src="${rk}" alt="" onerror="this.remove()">` : ''}${m.rp != null ? `${fmt(m.rp)} RP` : ''}</div>
+    </div>
+    ${matchExtra(m)}
+  </div>`;
+}
+
+/* 按「赛季 + 会话」分组 —— 同一时段连打的几局放一起，和 ALS 自己的口径一致 */
+function groupMatches(list) {
+  const groups = [];
+  for (const m of list) {
+    const k = `${m.split ?? '?'}|${m.session ?? 0}`;
+    let g = groups.find((x) => x.k === k);
+    if (!g) groups.push((g = { k, split: m.split, list: [] }));
+    g.list.push(m);
+  }
+  return groups;
+}
+
+/* 按赛季分组（赛季号降序，新的在前）。
+   split 可能跨上下半段，所以收集成集合，展示时再压缩成「第 1 段」或「第 1–2 段」。 */
+function groupBySeason(list) {
+  const by = new Map();
+  for (const m of list) {
+    const k = m.season ?? 0;
+    let g = by.get(k);
+    if (!g) {
+      by.set(k, (g = {
+        season: m.season ?? null,
+        name: m.seasonName ?? null,
+        start: m.seasonStart ?? null,
+        splits: new Set(),
+        list: [],
+      }));
+    }
+    if (m.seasonSplit) g.splits.add(m.seasonSplit);
+    g.list.push(m);
+  }
+  for (const g of by.values()) {
+    g.split = [...g.splits].sort((a, b) => a - b).join('–') || null;
+    // 组内按时间降序，保证最新在前
+    g.list.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
+  }
+  return [...by.values()].sort((a, b) => (b.season ?? 0) - (a.season ?? 0));
+}
+
+const seasonGroupsCount = (list) => new Set(list.map((x) => x.season ?? 0)).size;
+
+/* TRN 的**会话行**。与 ALS 的逐场行必须区分开：
+   它的 kills/damage 是「这一段时间的合计」，不是单场 —— 直接当逐场显示会误导。
+   所以加「会话」徽标 + 单独的列（N 场），并去掉地图/时长（TRN 没有）。
+
+   段位：TRN 提供 `rankScoreInfo`（名 + 徽章图 + 主题色），
+   但**只有 match 级有**（83/87），缺失时退回不带图的文字段位。 */
+function trnRow(s) {
+  const img = legendImg(s.legend);
+  const chg = s.rpChange;
+  const cls = chg == null ? 'na' : chg > 0 ? 'up' : 'dn';
+  const chgTxt = chg == null ? '—' : chg > 0 ? `+${chg}` : String(chg);
+  /* 时间放**最上面**（对齐 tracker.gg 的 "1 day ago" 作为行标签），
+     比埋在灰色 meta 里显眼得多 —— 用户反馈过「看不到对局时间」。 */
+  const when = whenLabel(s.timestamp, s.matchCount > 1 ? `${s.matchCount} 场` : '');
+  const ks = [
+    s.kills != null ? ['击杀', fmt(s.kills)] : null,
+    s.damage != null ? ['伤害', fmt(s.damage)] : null,
+  ].filter(Boolean)
+    .map(([k, v]) => `<span><span class="k">${esc(k)}</span><b>${esc(v)}</b></span>`).join('');
+
+  /* 段位：优先用 TRN 给的 CDN 徽章图；没有图就只显示段位名。
+     图片用 tracker.gg 的 trackercdn（已在导出白名单里，且是公开资源）。 */
+  const rankName = s.rankName
+    ? String(s.rankName).replace(/(\d+)\s*$/, (m, n) => ['', 'I', 'II', 'III', 'IV'][n] ?? m)
+    : null;
+  const rankBadge = s.rankImg
+    ? `<img src="${esc(s.rankImg)}" alt="${esc(rankName ?? '')}" onerror="this.remove()">`
+    : '';
+
+  return `<div class="mrow trn${s.playlist === 'ranked' ? ' is-ranked' : ''}">
+    <div class="av-wrap">
+      <div class="av-f">${legendInitial(s.legend)}</div>
+      ${img ? `<img class="av" src="${img}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+    </div>
+    <div>
+      ${when}
+      <div class="nm" title="${esc(s.legend ?? '')}">${esc(legendCN(s.legend) ?? '—')}<span class="badge-sess">会话</span>${playlistBadge(s.playlist)}</div>
+    </div>
+    <div class="ks${ks ? '' : ' na'}">${ks || '<span><span class="k">统计</span><b>—</b></span>'}</div>
+    <div class="rp">
+      <div class="chg ${cls}">${chgTxt}</div>
+      <div class="rpv">${rankBadge}${s.rp != null ? `${fmt(s.rp)} RP` : ''}${
+        rankName ? `<span class="rk">${esc(rankName)}</span>` : ''}</div>
+    </div>
+  </div>`;
+}
+
+function renderMatches(pack) {
+  if (!SHOW_MATCHES) return;
+  const card = ensureMatchCard();
+
+  const rawAls = pack?.als ?? [];
+  const rawTrn = pack?.trn ?? [];
+  /* 本项目只用 tracker.gg，所以 ALS 用不上（保留变量以便回退时使用）。 */
+  const alsAll = [];
+
+  /* TRN 全部保留（alsAll 恒为空 → alsNewest = 0）。 */
+  const trnAll = rawTrn
+    .slice()
+    .sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
+
+  if (!alsAll.length && !trnAll.length) {
+    card.innerHTML = `${matchHead('—')}<div class="note">还没有 tracker.gg 的对局数据。
+      <br>到「<b>数据对比</b>」页签按指引做一次浏览器采集即可。</div>`;
+    return;
+  }
+
+  /* ── 排位/匹配统计与筛选 ── */
+  const all = [...trnAll, ...alsAll];
+
+  /* 赛季筛选：只列出真正有数据的赛季（降序） */
+  const seasonsPresent = [...new Set(trnAll.map((m) => m.season).filter((x) => x != null))]
+    .sort((a, b) => b - a);
+  const latestSeason = seasonsPresent[0] ?? null;
+
+  /* ── 当前赛季（后端按系统日期算出，不是从对局数据反推）──
+     玩家可能一段时间没打，数据最新赛季很可能**落后于**当前赛季，
+     这时必须说清楚，否则用户会以为「赛季按钮里没有当前赛季」是 bug。
+     单独占一行：塞进筛选条的 flex 行里会被挤压截断（试过）。 */
+  const cs = curSeasonInfo?.season ?? null;
+  const csStale = curSeasonInfo?.stale === true;              // 内置赛季表已过期
+  const csInconsistent = curSeasonInfo?.consistent === false; // 与 tracker.gg 不一致
+  const dataBehind = cs != null && latestSeason != null && latestSeason < cs;
+
+  const csNote = cs == null ? '' : `<div class="season-now">
+    <span class="cs" title="按当前日期判断，与 tracker.gg 的 currentSeason 交叉验证">
+      当前赛季 <b>S${cs}</b>${curSeasonInfo.name ? ` · ${esc(curSeasonInfo.name)}` : ''}${
+        curSeasonInfo.split ? ` · 第 ${curSeasonInfo.split} 段` : ''}
+    </span>
+    ${dataBehind
+      ? `<span class="cs warn" title="数据里的最新赛季早于当前赛季；按「数据对比」页的指引重新采集即可拿到新赛季">⚠️ 数据最新只到 S${latestSeason}</span>`
+      : ''}
+    ${csInconsistent
+      ? `<span class="cs warn" title="两边的当前赛季不一致，说明内置赛季表需要更新">⚠️ 与 tracker.gg 不一致（对方报 S${curSeasonInfo.trackerSays}），请更新 SEASONS</span>`
+      : ''}
+    ${csStale
+      ? `<span class="cs warn" title="当前日期已超出内置赛季表的覆盖范围">⚠️ 赛季表可能已过期，请更新 SEASONS</span>`
+      : ''}
+  </div>`;
+
+  /* ⚠️ **默认只看最新赛季**：87 个会话跨 5 个赛季、页面高 7000+px，
+     一次全铺出来很难看（用户在走势图处也提过同样需求）。
+     与走势图一致的「默认跟随 + 手动锁定」：
+       if (!touched && 当前值不是最新) 跟随最新；
+     这样既满足「默认最新」，又不会在重新查询后把用户的选择弄丢、
+     或停在已不存在的赛季上。 */
+  if (!seasonFilterTouched && seasonFilter !== latestSeason) seasonFilter = latestSeason;
+
+  /* 类型统计（排位/匹配）按**当前赛季**算，否则按钮上的数字与实际显示不符 */
+  const inSeason = trnAll.filter(passSeason);
+  const cnt = { ranked: 0, pubs: 0, unknown: 0 };
+  inSeason.forEach((x) => { if (cnt[x.playlist] != null) cnt[x.playlist]++; });
+  // 类型筛选 + 赛季筛选同时生效
+  const shownAls = alsAll.filter((m) => passFilter(m.playlist) && passSeason(m));
+  const shownTrn = inSeason.filter((s) => passFilter(s.playlist));
+
+  const fbtn = (v, label, n) =>
+    `<button class="tbtn${matchFilter === v ? ' on' : ''}" data-pl="${v}">${label}${
+      n == null ? '' : ` ${n}`}</button>`;
+  const seasBtn = (v, label) =>
+    `<button class="tbtn${seasonFilter === v ? ' on' : ''}" data-season="${v}">${label}</button>`;
+
+  const filterBar = `<div class="mh-filter">
+    <span class="lb">类型</span>
+    ${fbtn('all', '全部', inSeason.length)}
+    ${fbtn('ranked', '排位', cnt.ranked)}
+    ${fbtn('pubs', '匹配', cnt.pubs + cnt.unknown)}
+  </div>
+  ${seasonsPresent.length > 1 ? `<div class="mh-filter" style="margin-top:-6px">
+    <span class="lb">赛季</span>
+    <button class="tbtn${seasonFilter == null ? ' on' : ''}" data-season="">全部 ${seasonsPresent.length}</button>
+    ${seasonsPresent.map((s) => {
+      const n = trnAll.filter((m) => m.season === s).length;
+      // 当前赛季加个小圆点标记，一眼看出「现在是这个赛季」
+      return seasBtn(s, `S${s} ${n}${s === cs ? '<i class="now-dot"></i>' : ''}`);
+    }).join('')}
+  </div>` : ''}
+  ${csNote}
+  <div class="src-note" style="margin:0 0 14px">
+    数据来自 <b>tracker.gg</b>（浏览器采集，无需 API Key）。
+    每个「会话」是一次连续游戏的<b>合计</b>，不是单场 —— 所以没有地图与逐场时长。<br>
+    排位按「RP 有变动」判定；变动为 0 时无法区分「匹配」与「净变化为 0 的排位」，故标为未定。
+    赛季归属按时间戳推导（tracker.gg 不提供赛季起止时间）。
+  </div>`;
+
+  /* 筛选后为空 → 明确提示，不要留一片空白（筛选条要保留，否则用户无法切回来） */
+  if (!shownAls.length && !shownTrn.length) {
+    card.innerHTML = `${matchHead('—')}${filterBar}
+      <div class="note">当前筛选下没有对局。换个赛季或类型试试。</div>`;
+    bindMatchFilter();
+    return;
+  }
+
+  /* 汇总指标：净 RP 与最常使用用**当前展示的全部记录**算（TRN + ALS）。
+     （不再统计「总时长」—— tracker.gg 的会话级聚合没有时长。） */
+  const shownAll = [...shownTrn, ...shownAls];
+  const net = shownAll.reduce((s, m) => s + (m.rpChange ?? 0), 0);
+  const picked = {};
+  shownAll.forEach((m) => m.legend && (picked[m.legend] = (picked[m.legend] ?? 0) + 1));
+  const top = Object.entries(picked).sort((a, b) => b[1] - a[1])[0];
+
+  /* ── 按**赛季**分组（tracker.gg 不给赛季时间，后端的 seasonOf() 用内置赛季表推导）──
+     每个组头显示：赛季号 · 主题名 · 开始日期 · 会话数 · 排位/未定分布 · 净 RP */
+  const seasonGroups = groupBySeason(shownTrn).map((g) => {
+    const gnet = g.list.reduce((s, m) => s + (m.rpChange ?? 0), 0);
+    const gr = g.list.filter((m) => m.playlist === 'ranked').length;
+    const gu = g.list.length - gr;
+    const first = whenText(g.list.at(-1)); // 组内最旧
+    const last = whenText(g.list[0]);       // 组内最新
+    /* 组头也带上相对时间（对齐 tracker.gg 的 "Session Overview 1 day ago"），
+       指「这个赛季最近一次打是多久前」—— 比绝对时间范围更直观。 */
+    const rel = relTime(g.list[0]?.timestamp);
+    return `<div class="mh-group">
+      <div class="mh-split">
+        <span class="sp">S${g.season ?? '?'}</span>
+        <span>
+          ${esc(g.name ?? '')}${g.start ? ` · ${esc(g.start)} 起` : ''} ·
+          ${g.list.length} 个会话 · 排位 ${gr}${gu ? ` / 未定 ${gu}` : ''} ·
+          净 RP ${gnet > 0 ? '+' : ''}${fmt(gnet)}
+        </span>
+      </div>
+      <div class="mh-range" title="${esc(first)} → ${esc(last)}">${
+        rel ? `<b>${esc(rel)}</b> · ` : ''}${esc(first)} → ${esc(last)}${
+        g.split ? ` · 第 ${g.split} 段` : ''}</div>
+      ${g.list.map(trnRow).join('')}
+    </div>`;
+  }).join('');
+
+  const trnGroup = shownTrn.length ? `<div class="mh-group">
+    <div class="mh-split"><span class="sp trn">TRACKER.GG</span>
+      <span>${shownTrn.length} 个会话${
+        seasonGroupsCount(shownTrn) > 1 ? ` · 覆盖 ${seasonGroupsCount(shownTrn)} 个赛季` : ''}</span></div>
+    <div class="src-note">来自 tracker.gg（浏览器采集）。<b>每个「会话」是一次连续游戏的合计</b>，
+      不是单场，也没有地图与时长。赛季归属由内置赛季表按时间戳推导
+      （tracker.gg 本身不提供赛季起止时间）。</div>
+    ${seasonGroups}
+  </div>` : '';
+
+  const groups = groupMatches(shownAls).map((g) => {
+    const gnet = g.list.reduce((s, m) => s + (m.rpChange ?? 0), 0);
+    const head = `${esc(whenText(g.list[0]))} · ${g.list.length} 场` +
+      (gnet ? ` · 净 RP ${gnet > 0 ? '+' : ''}${fmt(gnet)}` : '');
+    return `<div class="mh-group">
+      <div class="mh-split"><span class="sp">${esc(splitLabel(g.split))}</span><span>${head}</span></div>
+      ${g.list.map(matchRow).join('')}
+    </div>`;
+  }).join('');
+
+  const alsGroup = shownAls.length ? `<div class="mh-group">
+    <div class="mh-split"><span class="sp">ALS</span>
+      <span>逐场明细 · ${shownAls.length} 场</span></div>
+    ${groups}
+  </div>` : '';
+
+  const sub = (() => {
+    const n = shownAls.length + shownTrn.length;
+    const parts = [];
+    if (seasonFilter == null) parts.push(`全部 ${seasonsPresent.length} 个赛季`);
+    else parts.push(`S${seasonFilter}`);
+    if (matchFilter !== 'all') parts.push(matchFilter === 'ranked' ? '仅排位' : '仅匹配');
+    parts.push(`${n} 个会话`);
+    return parts.join(' · ');
+  })();
+
+  card.innerHTML = `${matchHead(sub)}
+    <div class="mh-sum">
+      <div><div class="k">排位</div><div class="v">${cnt.ranked}</div></div>
+      <div><div class="k">匹配${cnt.unknown ? ' / 未定' : ''}</div><div class="v">${cnt.pubs}${cnt.unknown ? ` / ${cnt.unknown}` : ''}</div></div>
+      <div><div class="k">净 RP</div><div class="v ${net > 0 ? 'up' : net < 0 ? 'dn' : ''}">${net > 0 ? '+' : ''}${fmt(net)}</div></div>
+      ${seasonFilter == null && seasonsPresent.length ? `<div><div class="k">赛季</div><div class="v">${seasonsPresent.length}<small>个</small></div></div>` : ''}
+      ${top ? `<div><div class="k">最常使用</div><div class="v" title="${esc(top[0])}">${esc(legendCN(top[0]))} <small>${top[1]} ${shownTrn.length && !shownAls.length ? '个会话' : '场'}</small></div></div>` : ''}
+    </div>
+    ${filterBar}
+    ${trnGroup}${alsGroup}`;
+  bindMatchFilter();
+}
+
+/* 类型/赛季筛选：只重渲染卡片，不重新请求 */
+function bindMatchFilter() {
+  document.querySelectorAll('#matchCard .mh-filter .tbtn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.season !== undefined) {
+        const v = btn.dataset.season;
+        seasonFilter = v === '' ? null : Number(v);
+        seasonFilterTouched = true; // 手动选过之后就不再自动跟随最新
+      } else {
+        matchFilter = btn.dataset.pl;
+      }
+      const pack = matchCache.get(qKey(lastQuery ?? {}));
+      if (pack) renderMatches(pack);
+    });
+  });
+}
+
+
+/* TRN 会话 → 近似 ALS 逐场的形状，供走势图 / 常用传奇兜底。
+   ⚠️ 只是**字段形状**适配，语义仍是会话级聚合（kills 是时段合计），
+     所以这两处视图只在 ALS 没数据时才用它。 */
+function trnAsMatches(list) {
+  return (list ?? []).map((s) => ({
+    ...s,
+    stats: {
+      ...(s.kills != null ? { Kills: String(s.kills) } : {}),
+      ...(s.damage != null ? { Damage: String(s.damage) } : {}),
+      ...(s.wins != null ? { Wins: String(s.wins) } : {}),
+    },
+  }));
+}
+
+/** 逐场数据：优先 ALS；ALS 为空时用 TRN 会话兜底（保证走势图/常用传奇不空） */
+const perMatch = (pack) => (pack?.als?.length ? pack.als : trnAsMatches(pack?.trn));
+
+function renderPackage(pack) {
+  renderTrend(perMatch(pack));
+  renderMatches(pack);
+  renderPicks(perMatch(pack));
+}
+
+async function loadMatches({ auto = false } = {}) {
+  if (!NEED_MATCHES()) return;
+  // 页签点击（auto=false）但还没有查询结果 → 给个明确提示，别静默无反应
+  if (!lastQuery || !SHOW_MATCHES) {
+    if (!auto && SHOW_MATCHES) {
+      const card = ensureMatchCard();
+      card.innerHTML = `${matchHead('等待查询')}
+        <div class="note" style="text-align:left;padding:2px 0 14px">
+          先执行一次查询，这里会显示对局记录。</div>`;
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    return;
+  }
+  const key = qKey(lastQuery);
+
+  // 高亮已由 goto() 的 setActive 处理，这里不再动页签
+  const cached = matchCache.get(key);
+  if (cached) {
+    renderPackage(cached);
+    if (!auto && SHOW_MATCHES) $('matchCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if (matchInflight.has(key)) return; // 同一个玩家只发一次
+  matchInflight.add(key);
+
+  if (SHOW_MATCHES) {
+    const card = ensureMatchCard();
+    card.innerHTML = `${matchHead('加载中…')}
+      <div class="note" style="text-align:left;padding:2px 0 16px">
+        <span class="spin"></span>正在按赛季回溯对局记录…</div>
+      ${Array.from({ length: 6 }, () => '<div class="sk" style="height:38px;margin-bottom:9px"></div>').join('')}`;
+    // 自动加载不抢滚动位置（本次查询结束后页面本来就要回到顶部，会打架）
+    if (!auto) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /* 请求期间用户可能已经换了玩家：条件对不上就丢弃结果，
+     否则会把上一个玩家的对局画到新查询的页面上 */
+  const stale = () => qKey(lastQuery ?? {}) !== key;
+
+  try {
+    // provider:'both' —— 同时取 ALS 逐场与 TRN 会话，
+    // 这样对局记录里既能看明细、又能看到最新的那批。
+    const res = await fetchJson('/api/query', {
+      ...lastQuery, provider: 'trn',
+    });
+    const j = await res.json().catch(() => null);
+    if (!res.ok || !j?.ok) throw new Error(j?.error || `本地服务返回 HTTP ${res.status}`);
+    const pack = { als: j.matches ?? [], trn: j.trnSessions ?? [] };
+    matchCache.set(key, pack); // 结果本身有效，即使已切换玩家也照常入缓存
+    if (!stale()) renderPackage(pack);
+  } catch (e) {
+    if (!stale()) {
+      const box = `<pre class="errbox" style="margin:0">${esc(e.message || String(e))}</pre>`;
+      if (SHOW_MATCHES) ensureMatchCard().innerHTML = `${matchHead('加载失败')}${box}`;
+      const tc = $('trendCard');
+      if (SHOW_TREND && tc) tc.innerHTML = `${trendHead('加载失败')}${box}`;
+      const pc = $('picksCard');
+      if (SHOW_PICKS && pc) pc.innerHTML = `${picksHead('加载失败')}${box}`;
+    }
+  } finally {
+    matchInflight.delete(key);
+    buildTabs();
+  }
+}
+
+/* ── 查询 ── */
+async function doQuery() {
+  const uid = $('uid').value.trim();
+  const name = $('name').value.trim();
+  const platform = $('platform').value;
+
+  $('errbox').innerHTML = '';
+  if (!uid && !name) { showError('请填写 UID 或玩家名'); return; }
+
+  const btn = $('go');
+  btn.disabled = true;
+  setStatus('', '查询中…');
+  $('hint').textContent = '';
+  $('result').classList.remove('on');
+  $('skeleton').classList.add('on');
+
+  /* 换人了：先撤掉上一个玩家的对局卡片，并把页签复位到 Overview，
+     否则查询期间点到「对局记录」会拿旧条件去请求、或残留旧卡片。
+     筛选状态也一并复位 —— 上个玩家选中的赛季在新玩家身上可能根本不存在。 */
+  $('matchCard')?.remove();
+  lastQuery = null;
+  seasonFilter = null;
+  seasonFilterTouched = false; // 回到「自动跟随最新赛季」
+  trendSeason = null;
+  trendSeasonTouched = false; // 回到「自动跟随最新赛季」
+  showPage('overview'); // 切回第一页，顺带丢掉「常用传奇」页里的旧数据
+  setActive('top');
+  buildTabs();
+
+  /* 查询条件写进 URL，刷新和分享都能复现；用 replaceState 免得每次查询都塞一条历史 */
+  const qs = new URLSearchParams(uid ? { uid, platform } : { name, platform });
+  try {
+    history.replaceState(null, '', '?' + qs);
+    localStorage.setItem('apex:last', '?' + qs);
+  } catch {}
+
+  try {
+    const res = await fetch('/api/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // 与 loadMatches 一致：加超时，避免上游不通时界面无限等待
+      body: JSON.stringify({ uid, name, platform }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) throw new Error(`本地服务返回 HTTP ${res.status} ${res.statusText}`);
+    const j = await res.json();
+    if (!j.ok) {
+      showError(j.error || '查询失败');
+      setStatus('err', '查询失败');
+      return;
+    }
+    // 记下条件（对局页签要用同一套 uid/name/platform 再查一次）
+    lastQuery = { uid, name, platform };
+    curSeasonInfo = j.record?.seasonInfo ?? null;
+    render(j);
+    setStatus('ok', '查询成功');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (e) {
+    const raw = e.message || String(e);
+    /* 区分「服务没起」和「查询本身失败」，前者给出可操作的提示 */
+    const msg = /Failed to fetch|NetworkError|load failed|fetch/i.test(raw)
+      ? `连不上本地服务。请确认 server.mjs 正在运行：\n\n    cd ${location.pathname.replace(/\/$/, '') || '.'}\n    node server.mjs\n\n（${raw}）`
+      : raw;
+    showError(msg);
+    setStatus('err', /HTTP 5/.test(raw) ? '服务异常' : '连接失败');
+  } finally {
+    btn.disabled = false;
+    $('skeleton').classList.remove('on');
+  }
+}
+
+function showError(msg) {
+  $('errbox').innerHTML = `<pre class="errbox">${esc(msg)}</pre>`;
+}
+
+function setStatus(kind, text) {
+  const el = $('status');
+  el.className = kind;
+  el.textContent = text;
+}
+
+/* ── 页签：完全由下面这张注册表生成 ──
+   关键：**不渲染**（而不是渲染成禁用态）—— 之前用 `disabled` + 降透明度，
+   页面上会留下点不动的灰按钮，看着像功能坏了。 */
+const TABS = [
+  { id: 'tabTop', target: 'top', label: 'Overview', show: () => true },
+  { id: 'tabPicks', target: 'picks', label: '常用传奇', show: () => SHOW_PICKS },
+  { id: 'tabCompare', target: 'compare', label: '数据对比', show: () => SHOW_COMPARE,
+    title: 'ALS 与 TRN 两源交叉对比（走 --provider both，TRN 需 API Key）' },
+  { id: 'tabLegend', target: 'legendCard', label: 'Legends', show: () => SHOW_LEGENDS },
+  { id: 'tabRank', target: 'rankCard', label: '排行', show: () => SHOW_RANK },
+  { id: 'tabMatch', target: 'matchCard', label: '对局记录', show: () => SHOW_MATCHES,
+    title: '查询时已自动加载（额外 2~4 个请求）' },
+];
+
+/* 当前高亮的落点（'top' / 'picks' / 区块 id） */
+let activeTab = 'top';
+
+/* 该页签此刻是否值得出现：
+   flag 开着，且目标确实存在。
+   legendCard / rankCard 依赖数据（没有段位击杀就根本不会生成），
+   所以必须看 DOM；picks / matchCard 则是固定页面，有 flag 就够。 */
+function tabReady(t) {
+  if (!t.show()) return false;
+  if (t.target === 'top') return true;
+  if (t.target === 'picks') return SHOW_PICKS;
+  if (t.target === 'compare') return SHOW_COMPARE;
+  if (t.target === 'matchCard') return SHOW_MATCHES;
+  return Boolean(document.getElementById(t.target));
+}
+
+function setActive(target) {
+  activeTab = target;
+  TABS.forEach((t) => $(t.id)?.classList.toggle('on', t.target === target));
+}
+
+/* 重建页签。render() / loadMatches() 后都要调一次：
+   数据变了可能有区块消失（如某玩家没有带击杀的传奇），
+   对应的页签要跟着收起，而不是留一个点了没反应的按钮。 */
+function buildTabs() {
+  const nav = $('tabs');
+  if (!nav) return;
+  const items = TABS.filter(tabReady);
+  // 原来高亮的页签已不存在时，回落到第一个可用项
+  if (!items.some((t) => t.target === activeTab)) activeTab = items[0]?.target ?? 'top';
+  nav.innerHTML = items
+    .map((t) => `<button id="${t.id}"${t.title ? ` title="${esc(t.title)}"` : ''}>${esc(t.label)}</button>`)
+    .join('');
+  items.forEach((t) => $(t.id).addEventListener('click', () => goto(t.target)));
+  setActive(activeTab);
+}
+
+function goto(target) {
+  setActive(target);
+  // 「常用传奇」/「数据对比」是独立页面：切页 + 回到顶部
+  if (target === 'picks' || target === 'compare') {
+    showPage(target);
+    // 对比页要额外拉 TRN（限流），所以只在进来时按需加载
+    if (target === 'compare') loadCompare();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+  showPage('overview');
+  // 对局卡片是懒加载的：点它就是「去加载」（已加载则只是滚过去）
+  if (target === 'matchCard') { loadMatches(); return; }
+  const el = target === 'top' ? document.body : document.getElementById(target);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+$('go').addEventListener('click', doQuery);
+['uid', 'name'].forEach((id) => $(id).addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); doQuery(); }
+}));
+
+// 首帧先建页签（此时还没有数据，只会有 Overview）
+buildTabs();
+
+/* ── 初始化：URL 参数 > 上次查询 > 默认 bluekinger ── */
+(function init() {
+  const p = new URLSearchParams(location.search);
+  let uid = p.get('uid') || '';
+  let name = p.get('name') || '';
+  let platform = p.get('platform') || '';
+
+  if (!uid && !name) {
+    try {
+      const last = new URLSearchParams(localStorage.getItem('apex:last') || '');
+      uid = last.get('uid') || '';
+      name = last.get('name') || '';
+      platform = platform || last.get('platform') || '';
+    } catch {}
+  }
+  if (!uid && !name) name = 'bluekinger';
+
+  $('uid').value = uid;
+  $('name').value = name;
+  if (platform) $('platform').value = platform;
+
+  doQuery();
+})();
+</script>
+</body>
+</html>

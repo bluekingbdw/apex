@@ -1,0 +1,877 @@
+{
+  "player": {
+    "uid": "1010918821212",
+    "name": "L-icet",
+    "platform": "PC",
+    "level": 147,
+    "prestige": "Prestige 2",
+    "rankScore": 12368,
+    "rankTier": "diamond4",
+    "status": "Offline or invite only",
+    "rankPercentile": "8.26",
+    "rankPosition": "456,601"
+  },
+  "legends": [
+    {
+      "legend": "Ballistic",
+      "stats": {
+        "BR Kills": {
+          "value": 215,
+          "displayValue": "215",
+          "percentile": "55.19",
+          "position": "125,976"
+        },
+        "Tempest: Damage": {
+          "value": 27325,
+          "displayValue": "27,325",
+          "percentile": "42.09",
+          "position": "47,831"
+        },
+        "BR Season 17 wins": {
+          "value": 0,
+          "displayValue": "0",
+          "percentile": null,
+          "position": null
+        },
+        "BR Season 17 kills": {
+          "value": 3,
+          "displayValue": "3",
+          "percentile": null,
+          "position": null
+        }
+      }
+    },
+    {
+      "legend": "Global",
+      "stats": {
+        "Career Kills": {
+          "value": 9164,
+          "displayValue": "9,164",
+          "percentile": "27.21",
+          "position": "556,783"
+        },
+        "Career Revives": {
+          "value": 825,
+          "displayValue": "825",
+          "percentile": "60.96",
+          "position": "935,102"
+        },
+        "Career Wins": {
+          "value": 335,
+          "displayValue": "335",
+          "percentile": "32.46",
+          "position": "499,326"
+        }
+      }
+    },
+    {
+      "legend": "Revenant",
+      "stats": {
+        "BR Damage": {
+          "value": 238303,
+          "displayValue": "238,303",
+          "percentile": "15.05",
+          "position": "318,001"
+        },
+        "Tactical: Distance": {
+          "value": 103067,
+          "displayValue": "103,067",
+          "percentile": "11.82",
+          "position": "19,861"
+        }
+      }
+    },
+    {
+      "legend": "Crypto",
+      "stats": {
+        "BR Kills": {
+          "value": 58,
+          "displayValue": "58",
+          "percentile": null,
+          "position": null
+        },
+        "BR Damage": {
+          "value": 33589,
+          "displayValue": "33,589",
+          "percentile": "61.91",
+          "position": "736,968"
+        },
+        "BR Wins": {
+          "value": 4,
+          "displayValue": "4",
+          "percentile": "66.63",
+          "position": "463,304"
+        }
+      }
+    },
+    {
+      "legend": "Horizon",
+      "stats": {
+        "BR Kills": {
+          "value": 339,
+          "displayValue": "339",
+          "percentile": "54.28",
+          "position": "1,674,380"
+        },
+        "BR Damage": {
+          "value": 142060,
+          "displayValue": "142,060",
+          "percentile": "40.89",
+          "position": "1,153,255"
+        },
+        "Gravity lift: Teammates lifted": {
+          "value": 92,
+          "displayValue": "92",
+          "percentile": "66.24",
+          "position": "576,905"
+        },
+        "BR Season 17 wins": {
+          "value": 3,
+          "displayValue": "3",
+          "percentile": "65.23",
+          "position": "18,733"
+        },
+        "BR Wins": {
+          "value": 22,
+          "displayValue": "22",
+          "percentile": "35.06",
+          "position": "628,314"
+        }
+      }
+    },
+    {
+      "legend": "Gibraltar",
+      "stats": {
+        "BR Kills": {
+          "value": 57,
+          "displayValue": "57",
+          "percentile": null,
+          "position": null
+        },
+        "BR Damage": {
+          "value": 27979,
+          "displayValue": "27,979",
+          "percentile": "75.13",
+          "position": "854,346"
+        },
+        "BR Wins": {
+          "value": 5,
+          "displayValue": "5",
+          "percentile": "69.03",
+          "position": "570,944"
+        }
+      }
+    },
+    {
+      "legend": "Wattson",
+      "stats": {
+        "BR Kills": {
+          "value": 69,
+          "displayValue": "69",
+          "percentile": null,
+          "position": null
+        },
+        "BR Damage": {
+          "value": 51241,
+          "displayValue": "51,241",
+          "percentile": "56.37",
+          "position": "800,498"
+        },
+        "Enemy ordnance intercepted": {
+          "value": 117,
+          "displayValue": "117",
+          "percentile": "47.88",
+          "position": "83,735"
+        },
+        "BR Season 16 wins": {
+          "value": 0,
+          "displayValue": "0",
+          "percentile": null,
+          "position": null
+        },
+        "BR Season 17 wins": {
+          "value": 0,
+          "displayValue": "0",
+          "percentile": null,
+          "position": null
+        },
+        "BR Season 18 wins": {
+          "value": 0,
+          "displayValue": "0",
+          "percentile": null,
+          "position": null
+        }
+      }
+    },
+    {
+      "legend": "Fuse",
+      "stats": {
+        "BR Kills": {
+          "value": 118,
+          "displayValue": "118",
+          "percentile": "90.19",
+          "position": "1,540,732"
+        },
+        "BR Damage": {
+          "value": 54124,
+          "displayValue": "54,124",
+          "percentile": "55.42",
+          "position": "1,048,098"
+        },
+        "Knuckle cluster: Hits": {
+          "value": 1150,
+          "displayValue": "1,150",
+          "percentile": "75.36",
+          "position": "809,933"
+        },
+        "Motherlode: Enemies captured": {
+          "value": 44,
+          "displayValue": "44",
+          "percentile": "54.29",
+          "position": "98,598"
+        }
+      }
+    },
+    {
+      "legend": "Bangalore",
+      "stats": {
+        "BR Kills": {
+          "value": 605,
+          "displayValue": "605",
+          "percentile": "29.12",
+          "position": "1,000,847"
+        },
+        "BR Damage": {
+          "value": 281583,
+          "displayValue": "281,583",
+          "percentile": "23.12",
+          "position": "622,378"
+        },
+        "BR Season 15 wins": {
+          "value": 4,
+          "displayValue": "4",
+          "percentile": "30.33",
+          "position": "35,247"
+        },
+        "BR Season 15 kills": {
+          "value": 58,
+          "displayValue": "58",
+          "percentile": null,
+          "position": null
+        },
+        "BR Season 16 wins": {
+          "value": 1,
+          "displayValue": "1",
+          "percentile": "91.73",
+          "position": "63,704"
+        },
+        "BR Season 16 kills": {
+          "value": 17,
+          "displayValue": "17",
+          "percentile": null,
+          "position": null
+        },
+        "BR Season 17 kills": {
+          "value": 106,
+          "displayValue": "106",
+          "percentile": "95.76",
+          "position": "18,533"
+        },
+        "BR Season 19 kills": {
+          "value": 105,
+          "displayValue": "105",
+          "percentile": "96.77",
+          "position": "30,058"
+        },
+        "BR Season 20 wins": {
+          "value": 4,
+          "displayValue": "4",
+          "percentile": "38.28",
+          "position": "7,462"
+        },
+        "BR Wins": {
+          "value": 34,
+          "displayValue": "34",
+          "percentile": "26.52",
+          "position": "479,791"
+        }
+      }
+    },
+    {
+      "legend": "Wraith",
+      "stats": {
+        "BR Kills": {
+          "value": 486,
+          "displayValue": "486",
+          "percentile": "51.83",
+          "position": "2,350,271"
+        },
+        "BR Damage": {
+          "value": 208106,
+          "displayValue": "208,106",
+          "percentile": "46.57",
+          "position": "1,571,242"
+        },
+        "Into the void: Time": {
+          "value": 2818,
+          "displayValue": "2,818",
+          "percentile": "42.22",
+          "position": "701,638"
+        }
+      }
+    },
+    {
+      "legend": "Octane",
+      "stats": {
+        "BR Kills": {
+          "value": 299,
+          "displayValue": "299",
+          "percentile": "63.66",
+          "position": "3,506,767"
+        },
+        "BR Damage": {
+          "value": 101120,
+          "displayValue": "101,120",
+          "percentile": "63.52",
+          "position": "2,539,730"
+        },
+        "BR Wins": {
+          "value": 14,
+          "displayValue": "14",
+          "percentile": "63.05",
+          "position": "1,025,766"
+        }
+      }
+    },
+    {
+      "legend": "Bloodhound",
+      "stats": {
+        "BR Kills": {
+          "value": 68,
+          "displayValue": "68",
+          "percentile": null,
+          "position": null
+        },
+        "BR Damage": {
+          "value": 74264,
+          "displayValue": "74,264",
+          "percentile": "63.44",
+          "position": "2,163,398"
+        },
+        "Eye: Enemies scanned": {
+          "value": 1675,
+          "displayValue": "1,675",
+          "percentile": "56.01",
+          "position": "1,313,272"
+        },
+        "BR Season 15 kills": {
+          "value": 67,
+          "displayValue": "67",
+          "percentile": null,
+          "position": null
+        },
+        "BR Season 16 kills": {
+          "value": 16,
+          "displayValue": "16",
+          "percentile": null,
+          "position": null
+        }
+      }
+    },
+    {
+      "legend": "Caustic",
+      "stats": {
+        "BR Kills": {
+          "value": 98,
+          "displayValue": "98",
+          "percentile": null,
+          "position": null
+        },
+        "BR Damage": {
+          "value": 47453,
+          "displayValue": "47,453",
+          "percentile": "63.16",
+          "position": "1,139,253"
+        },
+        "BR Wins": {
+          "value": 4,
+          "displayValue": "4",
+          "percentile": "75.79",
+          "position": "717,905"
+        }
+      }
+    },
+    {
+      "legend": "Lifeline",
+      "stats": {
+        "BR Kills": {
+          "value": 317,
+          "displayValue": "317",
+          "percentile": "49.62",
+          "position": "1,934,347"
+        },
+        "BR Damage": {
+          "value": 156063,
+          "displayValue": "156,063",
+          "percentile": "34.84",
+          "position": "1,181,150"
+        },
+        "DOC drone: Healing": {
+          "value": 88515,
+          "displayValue": "88,515",
+          "percentile": "14.01",
+          "position": "232,449"
+        },
+        "BR Season 15 wins": {
+          "value": 0,
+          "displayValue": "0",
+          "percentile": null,
+          "position": null
+        }
+      }
+    },
+    {
+      "legend": "Pathfinder",
+      "stats": {
+        "BR Kills": {
+          "value": 942,
+          "displayValue": "942",
+          "percentile": "27.65",
+          "position": "1,232,022"
+        },
+        "BR Damage": {
+          "value": 425894,
+          "displayValue": "425,894",
+          "percentile": "21.86",
+          "position": "803,852"
+        },
+        "Survey: Beacons scanned": {
+          "value": 25,
+          "displayValue": "25",
+          "percentile": "57.22",
+          "position": "126,591"
+        },
+        "BR Season 15 wins": {
+          "value": 8,
+          "displayValue": "8",
+          "percentile": "20.34",
+          "position": "22,552"
+        },
+        "BR Season 15 kills": {
+          "value": 107,
+          "displayValue": "107",
+          "percentile": "95.2",
+          "position": "49,842"
+        },
+        "BR Season 16 wins": {
+          "value": 2,
+          "displayValue": "2",
+          "percentile": "75.91",
+          "position": "37,784"
+        },
+        "BR Season 16 kills": {
+          "value": 69,
+          "displayValue": "69",
+          "percentile": null,
+          "position": null
+        },
+        "BR Wins": {
+          "value": 37,
+          "displayValue": "37",
+          "percentile": "31.23",
+          "position": "699,374"
+        }
+      }
+    },
+    {
+      "legend": "Loba",
+      "stats": {
+        "BR Executions": {
+          "value": 10,
+          "displayValue": "10",
+          "percentile": "49.83",
+          "position": "26,790"
+        },
+        "Meters teleported": {
+          "value": 56999,
+          "displayValue": "56,999",
+          "percentile": "18.24",
+          "position": "115,572"
+        },
+        "Loot taken by allies": {
+          "value": 3109,
+          "displayValue": "3,109",
+          "percentile": "51.98",
+          "position": "289,821"
+        },
+        "BR Season 15 wins": {
+          "value": 0,
+          "displayValue": "0",
+          "percentile": null,
+          "position": null
+        },
+        "BR Season 15 kills": {
+          "value": 0,
+          "displayValue": "0",
+          "percentile": null,
+          "position": null
+        },
+        "BR Season 17 wins": {
+          "value": 2,
+          "displayValue": "2",
+          "percentile": "73.44",
+          "position": "65,838"
+        },
+        "BR Season 17 kills": {
+          "value": 60,
+          "displayValue": "60",
+          "percentile": null,
+          "position": null
+        },
+        "BR Season 20 wins": {
+          "value": 2,
+          "displayValue": "2",
+          "percentile": "62.61",
+          "position": "7,086"
+        }
+      }
+    },
+    {
+      "legend": "Mirage",
+      "stats": {
+        "BR Kills": {
+          "value": 258,
+          "displayValue": "258",
+          "percentile": "56.31",
+          "position": "1,126,309"
+        },
+        "BR Damage": {
+          "value": 103022,
+          "displayValue": "103,022",
+          "percentile": "42.69",
+          "position": "775,529"
+        },
+        "Bamboozles": {
+          "value": 1917,
+          "displayValue": "1,917",
+          "percentile": "27.99",
+          "position": "288,785"
+        }
+      }
+    },
+    {
+      "legend": "Rampart",
+      "stats": {
+        "BR Kills": {
+          "value": 112,
+          "displayValue": "112",
+          "percentile": "91.34",
+          "position": "788,420"
+        },
+        "BR Damage": {
+          "value": 53269,
+          "displayValue": "53,269",
+          "percentile": "44.63",
+          "position": "331,201"
+        },
+        "BR Wins": {
+          "value": 8,
+          "displayValue": "8",
+          "percentile": "40.97",
+          "position": "212,909"
+        }
+      }
+    },
+    {
+      "legend": "Valkyrie",
+      "stats": {
+        "BR Kills": {
+          "value": 1057,
+          "displayValue": "1,057",
+          "percentile": "12.4",
+          "position": "310,610"
+        },
+        "BR Damage": {
+          "value": 513684,
+          "displayValue": "513,684",
+          "percentile": "7.99",
+          "position": "205,853"
+        },
+        "BR Pistol kills": {
+          "value": 6,
+          "displayValue": "6",
+          "percentile": null,
+          "position": null
+        },
+        "BR Season 15 wins": {
+          "value": 13,
+          "displayValue": "13",
+          "percentile": "13.11",
+          "position": "5,351"
+        },
+        "BR Season 15 kills": {
+          "value": 146,
+          "displayValue": "146",
+          "percentile": "67.36",
+          "position": "11,292"
+        },
+        "BR Wins": {
+          "value": 64,
+          "displayValue": "64",
+          "percentile": "9.83",
+          "position": "143,779"
+        }
+      }
+    },
+    {
+      "legend": "Seer",
+      "stats": {
+        "BR Kills": {
+          "value": 120,
+          "displayValue": "120",
+          "percentile": "87.19",
+          "position": "1,205,729"
+        },
+        "BR Damage": {
+          "value": 46672,
+          "displayValue": "46,672",
+          "percentile": "52.38",
+          "position": "797,968"
+        },
+        "Focus of Attention: Enemies Hit": {
+          "value": 648,
+          "displayValue": "648",
+          "percentile": "26.01",
+          "position": "188,689"
+        }
+      }
+    },
+    {
+      "legend": "Ash",
+      "stats": {
+        "BR Kills": {
+          "value": 443,
+          "displayValue": "443",
+          "percentile": "31.25",
+          "position": "686,403"
+        },
+        "BR Damage": {
+          "value": 198480,
+          "displayValue": "198,480",
+          "percentile": "23.26",
+          "position": "468,404"
+        },
+        "BR Wins": {
+          "value": 23,
+          "displayValue": "23",
+          "percentile": "21.72",
+          "position": "236,068"
+        }
+      }
+    },
+    {
+      "legend": "Mad Maggie",
+      "stats": {
+        "BR Kills": {
+          "value": 426,
+          "displayValue": "426",
+          "percentile": "27.34",
+          "position": "401,161"
+        },
+        "BR Damage": {
+          "value": 194346,
+          "displayValue": "194,346",
+          "percentile": "17.76",
+          "position": "251,382"
+        },
+        "BR Wins": {
+          "value": 13,
+          "displayValue": "13",
+          "percentile": "32.11",
+          "position": "385,137"
+        }
+      }
+    },
+    {
+      "legend": "Newcastle",
+      "stats": {
+        "BR Kills": {
+          "value": 457,
+          "displayValue": "457",
+          "percentile": "18.79",
+          "position": "47,317"
+        },
+        "BR Damage": {
+          "value": 212262,
+          "displayValue": "212,262",
+          "percentile": "11.42",
+          "position": "12,313"
+        },
+        "BR Games played": {
+          "value": 694,
+          "displayValue": "694",
+          "percentile": "4.3",
+          "position": "1,180"
+        }
+      }
+    },
+    {
+      "legend": "Vantage",
+      "stats": {
+        "Spotter&#039;s Lens: Enemies Pinged": {
+          "value": 335,
+          "displayValue": "335",
+          "percentile": "26.73",
+          "position": "29,863"
+        },
+        "Echo relocation : Distance": {
+          "value": 38708,
+          "displayValue": "38,708",
+          "percentile": "19.85",
+          "position": "34,833"
+        },
+        "BR Season 15 wins": {
+          "value": 5,
+          "displayValue": "5",
+          "percentile": "33.1",
+          "position": "12,874"
+        },
+        "BR Season 15 kills": {
+          "value": 107,
+          "displayValue": "107",
+          "percentile": "93.48",
+          "position": "12,753"
+        },
+        "BR Season 16 kills": {
+          "value": 30,
+          "displayValue": "30",
+          "percentile": null,
+          "position": null
+        }
+      }
+    },
+    {
+      "legend": "Catalyst",
+      "stats": {
+        "BR Kills": {
+          "value": 15,
+          "displayValue": "15",
+          "percentile": null,
+          "position": null
+        },
+        "BR Damage": {
+          "value": 8642,
+          "displayValue": "8,642",
+          "percentile": "94.61",
+          "position": "171,795"
+        },
+        "Barricade: Doors Barricaded": {
+          "value": 25,
+          "displayValue": "25",
+          "percentile": "91.53",
+          "position": "152,965"
+        },
+        "Piercing Spikes: Damage": {
+          "value": 382,
+          "displayValue": "382",
+          "percentile": null,
+          "position": null
+        },
+        "BR Wins": {
+          "value": 0,
+          "displayValue": "0",
+          "percentile": null,
+          "position": null
+        }
+      }
+    },
+    {
+      "legend": "Conduit",
+      "stats": {
+        "BR Kills": {
+          "value": 349,
+          "displayValue": "349",
+          "percentile": "47.09",
+          "position": "159,458"
+        },
+        "BR Headshots": {
+          "value": 789,
+          "displayValue": "789",
+          "percentile": "39.33",
+          "position": "7,880"
+        },
+        "BR Revives": {
+          "value": 191,
+          "displayValue": "191",
+          "percentile": "21.97",
+          "position": "2,310"
+        },
+        "BR Season 19 wins": {
+          "value": 7,
+          "displayValue": "7",
+          "percentile": "50.16",
+          "position": "140,991"
+        }
+      }
+    },
+    {
+      "legend": "Alter",
+      "stats": {
+        "BR Kills": {
+          "value": 473,
+          "displayValue": "473",
+          "percentile": "29.92",
+          "position": "46,037"
+        },
+        "BR Damage": {
+          "value": 208294,
+          "displayValue": "208,294",
+          "percentile": "22.09",
+          "position": "17,398"
+        },
+        "Gift From The Rift: Items Seized": {
+          "value": 738,
+          "displayValue": "738",
+          "percentile": "10.17",
+          "position": "6,283"
+        },
+        "BR Season 21 wins": {
+          "value": 0,
+          "displayValue": "0",
+          "percentile": null,
+          "position": null
+        },
+        "BR Season 21 kills": {
+          "value": 5,
+          "displayValue": "5",
+          "percentile": null,
+          "position": null
+        }
+      }
+    },
+    {
+      "legend": "Sparrow",
+      "stats": {
+        "Tactical: Enemies Scanned": {
+          "value": 512,
+          "displayValue": "512",
+          "percentile": "54.8",
+          "position": "32,976"
+        },
+        "Passive: Double Jumps": {
+          "value": 3297,
+          "displayValue": "3,297",
+          "percentile": "48.81",
+          "position": "34,128"
+        },
+        "Ultimate: Damage": {
+          "value": 4608,
+          "displayValue": "4,608",
+          "percentile": "55.38",
+          "position": "39,893"
+        }
+      }
+    }
+  ],
+  "trackers": "Career Kills, Tempest: Damage, BR Kills"
+}
